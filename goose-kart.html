@@ -95,11 +95,11 @@ const CHARS=[
   {id:'honker',name:'Sir Honks-a-Lot',emoji:'🪿',color:0xF5F0DC,accent:0xFFA500,
    ability:'MEGA HONK',desc:'Shockwave stuns nearby racers',spd:1.0,hdl:1.0,cd:8000},
   {id:'grey',  name:'Grey Feather',   emoji:'🦢',color:0xBBBBBB,accent:0x7DF9FF,
-   ability:'ICE GLIDE',  desc:'Burst of speed',              spd:1.0,hdl:1.0,cd:6000},
+   ability:'ICE GLIDE',  desc:'Burst of speed',              spd:1.0,hdl:1.0,cd:12000},
   {id:'canada',name:'Goose Trudeau',  emoji:'🦆',color:0x2a2a2a,accent:0xFFFFFF,
    ability:'FEATHER BLAST',desc:'Shoot feathers forward',    spd:1.0,hdl:1.0,cd:5000},
   {id:'golden',name:'Golden Goose',   emoji:'⭐',color:0xFFCC00,accent:0xFF8800,
-   ability:'GOLDEN SPRINT',desc:'Massive speed burst',       spd:1.0,hdl:1.0,cd:10000},
+   ability:'???',desc:'Coming soon...',                      spd:1.0,hdl:1.0,cd:10000},
 ];
 const TRACKS=[
   {id:'snow',  name:'Frosty Peaks',emoji:'❄️',
@@ -1283,15 +1283,9 @@ function spawnKarts(){
   bots=[];
   CHARS.filter(c=>c.id!==ch.id).slice(0,3).forEach((bc,i)=>{
     const b={mesh:makeKart(bc.color,bc.accent),pos:gpos(i+1),angle:startAngle,spd:0,
-      cp:0,lap:1,totalCPs:0,done:false,stunned:0,boost:0,abReady:true,abCd:0,char:bc,aiTgt:5,aiWander:0,
-      // personality
-      swerveAmp:0.18+Math.random()*0.5,    // how wide they swerve side-to-side
-      swerveFreq:0.8+Math.random()*1.4,    // oscillation speed
-      swervePhase:Math.random()*Math.PI*2, // offset so bots don't sync
-      brakeChance:0.0008+Math.random()*0.002, // random brake probability per frame
-      brakeDur:0,                          // frames left braking
-      lookahead:8+Math.floor(Math.random()*16), // how far ahead on track to aim
-      aggression:0.5+Math.random()*0.5,   // speed multiplier (0.75–1.0 of max)
+      cp:0,lap:1,totalCPs:0,done:false,stunned:0,boost:0,abReady:true,abCd:0,char:bc,aiTgt:5,
+      lookahead:20+i*4, // staggered lookahead so bots don't all follow identical lines
+      laneOffset:[-4,0,4][i]??0, // lateral offset from track centre in world units
     };
     b.mesh.position.copy(b.pos);b.mesh.rotation.y=startAngle;scene.add(b.mesh);bots.push(b);
   });
@@ -1368,48 +1362,88 @@ function updatePlayer(dt){
 }
 
 function updateBot(b,dt){
-  const ms=b.boost>0?MAXSPD*1.7:MAXSPD;
+  const ms=b.boost>0?MAXSPD*b.char.spd*1.7:MAXSPD*b.char.spd;
 
   // ── LOOKAHEAD TARGET ───────────────────────────────────────────────────────
-  // Aim for a point further around the track based on personality
   const tgtIdx=(b.aiTgt+b.lookahead)%NCP;
   const tgt=trackPts[tgtIdx];
-  const dx=tgt.x-b.pos.x, dz=tgt.z-b.pos.z;
+  // Compute track right-normal at target to apply lane offset
+  const nextTgt=trackPts[(tgtIdx+1)%NCP];
+  const tdx=nextTgt.x-tgt.x, tdz=nextTgt.z-tgt.z, tl=Math.sqrt(tdx*tdx+tdz*tdz)||1;
+  const trtx=-tdz/tl, trtz=tdx/tl; // right normal
+  const dx=(tgt.x+trtx*b.laneOffset)-b.pos.x, dz=(tgt.z+trtz*b.laneOffset)-b.pos.z;
 
   // Advance base waypoint when close enough
   if(Math.sqrt(dx*dx+dz*dz)<9){
     b.aiTgt=(b.aiTgt+5)%NCP;
   }
 
-  // ── SWERVE ─────────────────────────────────────────────────────────────────
-  // Sinusoidal lateral wander — accumulates over time, perpendicular to track direction
-  b.swervePhase+=dt*b.swerveFreq;
-  const swerveOffset=Math.sin(b.swervePhase)*b.swerveAmp;
-  // Add occasional random jolts to the wander
-  if(Math.random()<0.004) b.swervePhase+=( Math.random()-0.5)*1.2;
+  // ── KART REPULSION ─────────────────────────────────────────────────────────
+  const KART_SENSE=7;
+  let kartPushX=0, kartPushZ=0;
+  const others=[player,...bots.filter(x=>x!==b)];
+  for(const o of others){
+    const kx=b.pos.x-o.pos.x, kz=b.pos.z-o.pos.z;
+    const kdist=Math.sqrt(kx*kx+kz*kz);
+    if(kdist<KART_SENSE && kdist>0.001){
+      const strength=(KART_SENSE-kdist)/KART_SENSE;
+      kartPushX+=kx/kdist*strength;
+      kartPushZ+=kz/kdist*strength;
+    }
+  }
+
+  // ── WALL AVOIDANCE ─────────────────────────────────────────────────────────
+  // Accumulate a repulsion vector from any nearby barrier segments
+  const WALL_SENSE=6.5; // how close before repulsion kicks in
+  let wallPushX=0, wallPushZ=0;
+  for(let s=0;s<barrierSegs.length;s++){
+    const {ax,az,bx,bz}=barrierSegs[s];
+    const sdx=bx-ax, sdz=bz-az;
+    const sl2=sdx*sdx+sdz*sdz; if(sl2<0.0001) continue;
+    const t=Math.max(0,Math.min(1,((b.pos.x-ax)*sdx+(b.pos.z-az)*sdz)/sl2));
+    const cx=ax+t*sdx, cz=az+t*sdz;
+    const wx=b.pos.x-cx, wz=b.pos.z-cz;
+    const dist=Math.sqrt(wx*wx+wz*wz);
+    if(dist<WALL_SENSE && dist>0.001){
+      const strength=(WALL_SENSE-dist)/WALL_SENSE;
+      wallPushX+=wx/dist*strength;
+      wallPushZ+=wz/dist*strength;
+    }
+  }
 
   // ── STEERING ───────────────────────────────────────────────────────────────
-  let ta=Math.atan2(-dx,-dz)+swerveOffset;
+  let ta=Math.atan2(-dx,-dz);
+  // Blend wall repulsion into target angle
+  if(wallPushX!==0||wallPushZ!==0){
+    const wallAng=Math.atan2(-wallPushX,-wallPushZ);
+    let wda=wallAng-ta;
+    while(wda>Math.PI)wda-=Math.PI*2;
+    while(wda<-Math.PI)wda+=Math.PI*2;
+    const wallStrength=Math.min(Math.sqrt(wallPushX*wallPushX+wallPushZ*wallPushZ),1);
+    ta+=wda*wallStrength*0.7;
+  }
+  // Blend kart repulsion into target angle
+  if(kartPushX!==0||kartPushZ!==0){
+    const kartAng=Math.atan2(-kartPushX,-kartPushZ);
+    let kda=kartAng-ta;
+    while(kda>Math.PI)kda-=Math.PI*2;
+    while(kda<-Math.PI)kda+=Math.PI*2;
+    const kartStrength=Math.min(Math.sqrt(kartPushX*kartPushX+kartPushZ*kartPushZ),1);
+    ta+=kda*kartStrength*0.5;
+  }
   let da=ta-b.angle;
   while(da>Math.PI)da-=Math.PI*2;
   while(da<-Math.PI)da+=Math.PI*2;
-  b.angle+=Math.sign(da)*Math.min(Math.abs(da),TURN*1.05);
+  b.angle+=Math.sign(da)*Math.min(Math.abs(da),TURN);
 
   // ── SPEED ──────────────────────────────────────────────────────────────────
   if(b.stunned>0){
     b.stunned-=dt*1000; b.spd*=0.88;
   } else {
-    // Random braking moments
-    if(b.brakeDur>0){
-      b.brakeDur-=dt*1000;
-      b.spd=Math.max(b.spd-BRK*1.2, ms*0.2);
-    } else {
-      if(Math.random()<b.brakeChance) b.brakeDur=300+Math.random()*600;
-      // Slow slightly through sharp corners
-      const cornerSlow=1-Math.min(Math.abs(da)*0.5,0.35);
-      const topSpd=ms*(0.75+b.aggression*0.25)*cornerSlow;
-      b.spd=Math.min(b.spd+ACC*0.82, topSpd);
-    }
+    // Slow slightly through sharp corners
+    const cornerSlow=1-Math.min(Math.abs(da)*0.5,0.35);
+    const topSpd=ms*cornerSlow;
+    b.spd=Math.min(b.spd+ACC, topSpd);
     if(b.boost>0) b.boost-=dt*1000;
   }
 
@@ -1456,13 +1490,29 @@ function resolveCollisions(){
 function updateProjs(dt){
   for(let i=projs.length-1;i>=0;i--){
     const p=projs[i];p.life-=dt*1000;
+
+    // Mild heat seeking — nudge velocity toward nearest victim
+    let nearestDist=Infinity, nearestV=null;
+    for(const v of p.victims){
+      const d=Math.hypot(p.pos.x-v.pos.x,p.pos.z-v.pos.z);
+      if(d<nearestDist){nearestDist=d;nearestV=v;}
+    }
+    if(nearestV&&nearestDist<40){
+      const tdx=nearestV.pos.x-p.pos.x, tdz=nearestV.pos.z-p.pos.z;
+      const tl=Math.sqrt(tdx*tdx+tdz*tdz)||1;
+      p.dx+=(tdx/tl*1.4-p.dx)*0.04; // gently blend toward target direction
+      p.dz+=(tdz/tl*1.4-p.dz)*0.04;
+    }
+
     p.pos.x+=p.dx;p.pos.z+=p.dz;
     p.mesh.position.set(p.pos.x,1.2,p.pos.z);
     // Spin the feather on its travel axis and wobble up/down slightly
     p.mesh.rotation.y+=(p.spin||0.18);
     p.mesh.position.y=1.2+Math.sin(p.life*0.008)*0.4;
+    // Point mesh in direction of travel
+    p.mesh.rotation.y=Math.atan2(-p.dx,-p.dz);
     let hit=false;
-    for(const v of p.victims)if(Math.hypot(p.pos.x-v.pos.x,p.pos.z-v.pos.z)<5.0){v.stunned=2200;hit=true;break;}
+    for(const v of p.victims)if(Math.hypot(p.pos.x-v.pos.x,p.pos.z-v.pos.z)<5.0){v.stunned=1400;hit=true;break;}
     if(hit||p.life<=0){scene.remove(p.mesh);projs.splice(i,1);}
   }
 }
@@ -1478,12 +1528,12 @@ function spawnShockwave(pos,col,victims){
 function updateShockwaves(dt){
   for(let i=shockwaves.length-1;i>=0;i--){
     const sw=shockwaves[i];sw.radius+=40*dt;
-    sw.mat.opacity=0.85*(1-sw.radius/28);
+    sw.mat.opacity=0.85*(1-sw.radius/45);
     const s=sw.radius/1.8;sw.mesh.scale.set(s,s,s);
     for(const v of sw.victims){
-      if(!sw.hit.has(v)&&Math.hypot(v.pos.x-sw.ox,v.pos.z-sw.oz)<=sw.radius){v.stunned=800;sw.hit.add(v);}
+      if(!sw.hit.has(v)&&Math.hypot(v.pos.x-sw.ox,v.pos.z-sw.oz)<=sw.radius){v.stunned=900;sw.hit.add(v);}
     }
-    if(sw.radius>=28){scene.remove(sw.mesh);sw.mat.dispose();shockwaves.splice(i,1);}
+    if(sw.radius>=45){scene.remove(sw.mesh);sw.mat.dispose();shockwaves.splice(i,1);}
   }
 }
 
@@ -1496,10 +1546,19 @@ function useAbility(k,victims){
     spawnShockwave(k.pos,0xFFDD00,victims);
     if(ip){flash('#FFD700',0.45);floatMsg('💛 MEGA HONK!','#FFD700');}
   } else if(k.char.id==='grey'){
-    k.boost=3000;if(ip){flash('#7DF9FF',0.3);floatMsg('❄️ ICE GLIDE!','#7DF9FF');}
+    k.boost=1000;if(ip){flash('#7DF9FF',0.3);floatMsg('❄️ ICE GLIDE!','#7DF9FF');}
   } else if(k.char.id==='canada'){
-    // Single large feather projectile — very visible
-    const ang=k.angle;
+    // Aim at the nearest victim that is ahead of the kart
+    let aimAng=k.angle;
+    let bestDist=Infinity;
+    for(const v of victims){
+      const vdx=v.pos.x-k.pos.x, vdz=v.pos.z-k.pos.z;
+      const dist=Math.sqrt(vdx*vdx+vdz*vdz);
+      // Check if victim is roughly in front (dot product with facing dir > 0)
+      const facingX=-Math.sin(k.angle), facingZ=-Math.cos(k.angle);
+      const dot=vdx/dist*facingX+vdz/dist*facingZ;
+      if(dot>0.3 && dist<bestDist){ bestDist=dist; aimAng=Math.atan2(-vdx,-vdz); }
+    }
     const group=new THREE.Group();
     // Main quill shaft — long bright white cylinder
     const shaft=new THREE.Mesh(
@@ -1522,23 +1581,36 @@ function useAbility(k,victims){
     );
     tip.position.set(0,0,-1.6);
     group.add(tip);
-    group.rotation.y=ang;
+    group.rotation.y=aimAng;
     group.position.set(k.pos.x,1.4,k.pos.z);
     scene.add(group);
-    const pm={mesh:group,pos:k.pos.clone(),dx:-Math.sin(ang)*1.4,dz:-Math.cos(ang)*1.4,life:3200,victims,spin:0.14};
+    const pm={mesh:group,pos:k.pos.clone(),dx:-Math.sin(aimAng)*1.4,dz:-Math.cos(aimAng)*1.4,life:5500,victims,spin:0.14};
     projs.push(pm);
     if(ip){flash('#FFFFFF',0.35);floatMsg('🪶 FEATHER BLAST!','#fff');}
   } else {
-    k.boost=4500;if(ip){flash('#FFD700',0.55);floatMsg('⭐ GOLDEN SPRINT!','#FFD700');}
+    k.boost=0; // ability not yet implemented
   }
 }
 
 function botAI(b){
   if(!b.abReady||raceStartTimer<3)return;
   const others=[player,...bots.filter(x=>x!==b)];
-  const near=others.some(k=>Math.hypot(b.pos.x-k.pos.x,b.pos.z-k.pos.z)<20);
-  const self=b.char.id==='grey'||b.char.id==='golden';
-  if(near||(self&&Math.random()<0.008))useAbility(b,others);
+  if(b.char.id==='canada'){
+    // Only fire if a target is ahead and within range
+    const facingX=-Math.sin(b.angle), facingZ=-Math.cos(b.angle);
+    const target=others.find(k=>{
+      const dx=k.pos.x-b.pos.x, dz=k.pos.z-b.pos.z;
+      const dist=Math.sqrt(dx*dx+dz*dz);
+      if(dist>30||dist<0.001)return false;
+      const dot=dx/dist*facingX+dz/dist*facingZ;
+      return dot>0.5; // must be within ~60° cone ahead
+    });
+    if(target)useAbility(b,others);
+  } else {
+    const near=others.some(k=>Math.hypot(b.pos.x-k.pos.x,b.pos.z-k.pos.z)<20);
+    const self=b.char.id==='grey'||b.char.id==='golden';
+    if(near||(self&&Math.random()<0.008))useAbility(b,others);
+  }
 }
 
 // ── CAMERA ────────────────────────────────────────────────────────────────────

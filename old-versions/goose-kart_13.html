@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HONK KART</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; font-family:'Arial Black',sans-serif; }
+#c { display:block; width:100vw; height:100vh; }
+
+#hud { position:fixed; top:12px; left:50%; transform:translateX(-50%);
+  display:none; gap:16px; align-items:center; }
+.hb { background:rgba(0,0,0,.7); border:2px solid rgba(255,255,255,.25);
+  border-radius:10px; padding:6px 16px; color:#fff; font-size:17px; }
+#lapd { color:#FFD700; }
+#posd { color:#7DF9FF; }
+#spdd { color:#90EE90; }
+
+#abbar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+  display:none; align-items:center; gap:10px; }
+#abicon { width:58px; height:58px; background:rgba(0,0,0,.75);
+  border:3px solid #FFD700; border-radius:12px; display:flex;
+  align-items:center; justify-content:center; font-size:32px; }
+#ablbl { color:#FFD700; font-size:14px; text-align:center; }
+#abcdw { width:58px; height:5px; background:#333; border-radius:3px; margin-top:4px; overflow:hidden; }
+#abfill { height:100%; background:#FFD700; width:100%; }
+
+#trkind { position:fixed; top:12px; right:12px; display:none;
+  background:rgba(0,0,0,.7); border:2px solid rgba(255,255,255,.2);
+  border-radius:10px; padding:6px 14px; color:#fff; font-size:15px; }
+
+#minimap { position:fixed; bottom:20px; right:12px; display:none;
+  border:2px solid rgba(255,255,255,.2); border-radius:10px; }
+
+#flash { position:fixed; inset:0; pointer-events:none; opacity:0; transition:opacity .3s; z-index:50; }
+#cdtxt { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+  font-size:110px; color:#FFD700; text-shadow:0 0 40px rgba(255,215,0,.8);
+  pointer-events:none; z-index:90; font-family:'Arial Black',sans-serif; }
+
+/* MENU */
+#menu { position:fixed; inset:0;
+  background:linear-gradient(135deg,#0d1b2a,#1a3a20,#0d1b2a);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:24px; z-index:100; }
+#menu h1 { font-size:68px; color:#FFD700;
+  text-shadow:4px 4px 0 #996600, 0 0 40px rgba(255,215,0,.5);
+  animation:bob 2s ease-in-out infinite; }
+@keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.mlbl { color:#fff; font-size:18px; align-self:flex-start; margin-left:4px; }
+.cgrid { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+.ccard { background:rgba(255,255,255,.07); border:2px solid rgba(255,255,255,.15);
+  border-radius:14px; padding:16px 20px; cursor:pointer; text-align:center;
+  min-width:130px; transition:all .2s; }
+.ccard:hover,.ccard.sel { background:rgba(255,215,0,.15); border-color:#FFD700;
+  transform:translateY(-5px); box-shadow:0 10px 25px rgba(255,215,0,.3); }
+.cemoji { font-size:44px; }
+.cname { color:#FFD700; font-size:17px; margin-top:6px; }
+.cabl { color:#aaa; font-size:12px; margin-top:3px; }
+.tgrid { display:flex; gap:14px; }
+.tcard { background:rgba(255,255,255,.07); border:2px solid rgba(255,255,255,.15);
+  border-radius:12px; padding:14px 20px; cursor:pointer; text-align:center;
+  min-width:110px; transition:all .2s; }
+.tcard:hover,.tcard.sel { border-color:#7DF9FF; background:rgba(125,249,255,.1);
+  transform:translateY(-4px); }
+.temoji { font-size:36px; }
+.tname { color:#7DF9FF; font-size:16px; margin-top:5px; }
+#sbtn { background:#FFD700; color:#000; border:none; border-radius:12px;
+  font-size:26px; font-weight:900; padding:12px 44px; cursor:pointer;
+  box-shadow:0 6px 20px rgba(255,215,0,.4); transition:all .2s; }
+#sbtn:hover { transform:scale(1.05); box-shadow:0 10px 30px rgba(255,215,0,.6); }
+
+/* FINISH */
+#fin { position:fixed; inset:0; background:rgba(0,0,0,.85);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  gap:18px; z-index:100; }
+#fin h2 { font-size:58px; color:#FFD700; text-shadow:3px 3px 0 #996600; }
+#finpos,#fintm { color:#fff; font-size:22px; }
+#rbtn { background:#FFD700; color:#000; border:none; border-radius:12px;
+  font-size:22px; font-weight:900; padding:10px 36px; cursor:pointer; margin-top:8px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="hb" id="lapd">LAP 1/3</div>
+  <div class="hb" id="posd">POS 1/4</div>
+  <div class="hb" id="spdd">0 km/h</div>
+</div>
+<div id="trkind"></div>
+<div id="abbar">
+  <div><div id="abicon">🪿</div><div id="abcdw"><div id="abfill"></div></div></div>
+  <div id="ablbl">ABILITY<br><span style="color:#aaa;font-size:11px">SPACE</span></div>
+</div>
+<canvas id="minimap" width="110" height="110"></canvas>
+<div id="flash"></div>
+<div id="cdtxt"></div>
+
+<div id="menu">
+  <h1>🪿 HONK KART</h1>
+  <div style="color:#aaffaa;font-size:22px;letter-spacing:2px;">GOOSE GRAND PRIX</div>
+  <div class="mlbl">Choose Your Goose</div>
+  <div class="cgrid" id="cgrid"></div>
+  <div class="mlbl">Select Track</div>
+  <div class="tgrid" id="tgrid"></div>
+  <button id="sbtn">🪿 HONK TO START!</button>
+  <div style="color:#666;font-size:13px;">WASD to drive · SPACE for ability</div>
+</div>
+
+<div id="fin">
+  <h2 id="fintitle">🏁 RACE OVER!</h2>
+  <div id="finpos"></div>
+  <div id="fintm"></div>
+  <button id="rbtn" onclick="location.reload()">RACE AGAIN</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+const CHARS = [
+  {id:'honker',name:'Sir Honks-a-Lot',emoji:'🪿',color:0xF5F0DC,accent:0xFFA500,
+   ability:'MEGA HONK',desc:'Stun nearby racers',spd:1.0,hdl:1.0,cd:8000},
+  {id:'grey',name:'Grey Feather',emoji:'🦢',color:0xBBBBBB,accent:0x7DF9FF,
+   ability:'ICE GLIDE',desc:'Speed on ice/snow',spd:1.15,hdl:0.85,cd:6000},
+  {id:'canada',name:'Goose Trudeau',emoji:'🦆',color:0x2a2a2a,accent:0xFFFFFF,
+   ability:'FEATHER BLAST',desc:'Shoot feathers forward',spd:0.95,hdl:1.1,cd:5000},
+  {id:'golden',name:'Golden Goose',emoji:'⭐',color:0xFFCC00,accent:0xFF8800,
+   ability:'GOLDEN SPRINT',desc:'Massive speed burst',spd:1.0,hdl:1.0,cd:10000},
+];
+
+const TRACKS = [
+  {id:'snow',name:'Frosty Peaks',emoji:'❄️',
+   sky:0x8BBFD4, ground:0xDDEEFF, road:0xBBCCDD, wall:0x7799AA,
+   fog:0xAAD0E8, fogD:0.012, ambient:0x99BBCC, sun:0xCCDDFF},
+  {id:'forest',name:'Fern Forest',emoji:'🌲',
+   sky:0x0a1a0a, ground:0x1a3a10, road:0x111111, wall:0x2a4a15,
+   fog:0x0a1a0a, fogD:0.018, ambient:0x223322, sun:0x99BB77},
+  {id:'grass',name:'Meadow Mile',emoji:'🌿',
+   sky:0x5BB8FF, ground:0x4a9a2a, road:0x444433, wall:0x2a6a10,
+   fog:0x99DDFF, fogD:0.008, ambient:0x88BBFF, sun:0xFFFFCC},
+];
+
+// ── GAME STATE ─────────────────────────────────────────────────────────────
+let scene,camera,renderer,clock;
+let player,bots=[],projs=[];
+let keys={},racing=false,finished=false,cdActive=false;
+let raceTime=0;
+let abReady=true,abCd=0,selChar,selTrack;
+let trackPts=[];
+const NLAPS=3;
+let NCP=200; // will be set after spline generation
+let mmCtx;
+
+// ── CATMULL-ROM SPLINE ────────────────────────────────────────────────────
+function catmullRom(p0,p1,p2,p3,t){
+  const t2=t*t, t3=t2*t;
+  return {
+    x: 0.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
+    z: 0.5*((2*p1.z)+(-p0.z+p2.z)*t+(2*p0.z-5*p1.z+4*p2.z-p3.z)*t2+(-p0.z+3*p1.z-3*p2.z+p3.z)*t3),
+  };
+}
+
+// ── TRACK PATH ─────────────────────────────────────────────────────────────
+function makeTrackPts(){
+  // Unique closed-loop control points (NO duplicate first/last)
+  // Last segment of the old track (the S-bend) has been smoothed into
+  // a gentle sweep back to the start instead of a sharp zigzag.
+  const ctrl = [
+    [ 80,  0],   // 0  start/finish
+    [ 92, 26],   // 1
+    [ 96, 54],   // 2
+    [ 84, 76],   // 3
+    [ 58, 92],   // 4
+    [ 26, 98],   // 5
+    [  0, 93],   // 6  top
+    [-26, 98],   // 7
+    [-58, 92],   // 8
+    [-84, 74],   // 9
+    [-96, 44],   // 10
+    [-96,  8],   // 11
+    [-88,-24],   // 12
+    [-74,-54],   // 13
+    [-54,-80],   // 14
+    [-22,-95],   // 15 bottom hairpin
+    [ 14,-92],   // 16
+    [ 44,-80],   // 17
+    [ 66,-55],   // 18 — was sharp kink, now gentler
+    [ 76,-28],   // 19 — smooth arc back toward start
+  ];
+  const N=ctrl.length; // true number of unique points
+  const STEPS=10;
+  const pts=[];
+  for(let i=0;i<N;i++){
+    const p0=ctrl[(i-1+N)%N];
+    const p1=ctrl[i];
+    const p2=ctrl[(i+1)%N];
+    const p3=ctrl[(i+2)%N];
+    for(let s=0;s<STEPS;s++){
+      const t=s/STEPS;
+      const r=catmullRom(
+        {x:p0[0],z:p0[1]},
+        {x:p1[0],z:p1[1]},
+        {x:p2[0],z:p2[1]},
+        {x:p3[0],z:p3[1]},
+        t
+      );
+      pts.push(new THREE.Vector3(r.x,0,r.z));
+    }
+  }
+  NCP=pts.length;
+  return pts;
+}
+
+// ── SCENE ──────────────────────────────────────────────────────────────────
+function initScene(){
+  const tk=selTrack;
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(tk.sky);
+  scene.fog=new THREE.FogExp2(tk.fog,tk.fogD);
+
+  // Perspective camera, top-down angle
+  camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,900);
+  camera.position.set(0,70,30);
+  camera.lookAt(0,0,0);
+
+  renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;
+
+  clock=new THREE.Clock();
+
+  // Lights
+  scene.add(new THREE.AmbientLight(tk.ambient,1.3));
+  const sun=new THREE.DirectionalLight(tk.sun,1.8);
+  sun.position.set(40,80,20);
+  sun.castShadow=true;
+  sun.shadow.mapSize.set(1024,1024);
+  scene.add(sun);
+
+  // Ground
+  const gm=new THREE.Mesh(
+    new THREE.PlaneGeometry(600,600),
+    new THREE.MeshLambertMaterial({color:tk.ground})
+  );
+  gm.rotation.x=-Math.PI/2;
+  gm.receiveShadow=true;
+  scene.add(gm);
+
+  trackPts=makeTrackPts();
+  buildRoad(tk);
+  buildDecos(tk);
+  spawnKarts();
+  mmCtx=document.getElementById('minimap').getContext('2d');
+}
+
+// ── ROAD ──────────────────────────────────────────────────────────────────
+function buildRoad(tk){
+  const pts=trackPts, N=pts.length;
+  const W=13; // half-width of driveable road
+  const KERB=1.8; // kerb strip width beyond road
+  const SHOULDER=1.2; // gravel shoulder
+
+  // Helper: get right-normal at point i
+  function getRN(i){
+    const c=pts[i%N], nx=pts[(i+1)%N];
+    const d=new THREE.Vector3().subVectors(nx,c).normalize();
+    return new THREE.Vector3(-d.z,0,d.x);
+  }
+  function getDir(i){
+    const c=pts[i%N], nx=pts[(i+1)%N];
+    return new THREE.Vector3().subVectors(nx,c).normalize();
+  }
+
+  // ── 1. ASPHALT SURFACE ──────────────────────────────────────────────────
+  const aVerts=[], aIdx=[];
+  for(let i=0;i<=N;i++){
+    const c=pts[i%N], r=getRN(i);
+    aVerts.push(c.x+r.x*W, 0.04, c.z+r.z*W);
+    aVerts.push(c.x-r.x*W, 0.04, c.z-r.z*W);
+    if(i<N){ const b=i*2; aIdx.push(b,b+2,b+1, b+1,b+2,b+3); }
+  }
+  const ag=new THREE.BufferGeometry();
+  ag.setAttribute('position',new THREE.Float32BufferAttribute(aVerts,3));
+  ag.setIndex(aIdx); ag.computeVertexNormals();
+  // Dark asphalt - much more visible than ground
+  const asphaltCol = tk.id==='snow' ? 0x445566 : tk.id==='forest' ? 0x1a1a1a : 0x2a2a2a;
+  scene.add(new THREE.Mesh(ag, new THREE.MeshLambertMaterial({color:asphaltCol})));
+
+  // ── 2. KERB STRIPES (red/white alternating) ──────────────────────────────
+  const kerbMatR=new THREE.MeshLambertMaterial({color:0xDD2222});
+  const kerbMatW=new THREE.MeshLambertMaterial({color:0xEEEEEE});
+  for(let i=0;i<N;i++){
+    const c=pts[i%N], nx=pts[(i+1)%N];
+    const r=getRN(i);
+    const d=getDir(i);
+    const len=c.distanceTo(nx);
+    const mid=new THREE.Vector3().addVectors(c,nx).multiplyScalar(0.5);
+    const angle=Math.atan2(d.x,d.z);
+    const mat=i%2===0?kerbMatR:kerbMatW;
+    // outer kerb both sides
+    for(const s of[-1,1]){
+      const km=new THREE.Mesh(new THREE.BoxGeometry(len+0.1,0.18,KERB),mat);
+      km.position.set(mid.x+r.x*(W+KERB/2)*s, 0.09, mid.z+r.z*(W+KERB/2)*s);
+      km.rotation.y=angle;
+      scene.add(km);
+    }
+  }
+
+  // ── 3. WHITE EDGE LINES (painted on asphalt) ─────────────────────────────
+  const lineW=0.55;
+  const lineMat=new THREE.MeshBasicMaterial({color:0xFFFFFF});
+  for(let i=0;i<N;i++){
+    const c=pts[i%N], nx=pts[(i+1)%N];
+    const r=getRN(i);
+    const d=getDir(i);
+    const len=c.distanceTo(nx)+0.2;
+    const mid=new THREE.Vector3().addVectors(c,nx).multiplyScalar(0.5);
+    const angle=Math.atan2(d.x,d.z);
+    for(const s of[-1,1]){
+      const lm=new THREE.Mesh(new THREE.BoxGeometry(len,0.06,lineW),lineMat);
+      lm.position.set(mid.x+r.x*(W-lineW/2-0.1)*s, 0.08, mid.z+r.z*(W-lineW/2-0.1)*s);
+      lm.rotation.y=angle;
+      scene.add(lm);
+    }
+  }
+
+  // ── 4. CENTRE DASHED LINE ────────────────────────────────────────────────
+  const dashMat=new THREE.MeshBasicMaterial({color:0xFFFFAA,opacity:.7,transparent:true});
+  for(let i=0;i<N;i++){
+    const c=pts[i%N], nx=pts[(i+1)%N];
+    const d=getDir(i);
+    const len=c.distanceTo(nx);
+    const mid=new THREE.Vector3().addVectors(c,nx).multiplyScalar(0.5);
+    const angle=Math.atan2(d.x,d.z);
+    // Only draw dash every other segment
+    if(i%2===0){
+      const dm=new THREE.Mesh(new THREE.BoxGeometry(len*0.55,0.06,0.4),dashMat);
+      dm.position.set(mid.x,0.08,mid.z);
+      dm.rotation.y=angle;
+      scene.add(dm);
+    }
+  }
+
+  // ── 5. START / FINISH CHEQUERED LINE + GANTRY ───────────────────────────
+  const s0=pts[0], s1=pts[1];
+  const sd=getDir(0);
+  const angle0=Math.atan2(sd.x,sd.z);
+  const rn0=new THREE.Vector3(-sd.z,0,sd.x);
+
+  // Chequered ground squares
+  const sqW=(W*2)/8;
+  for(let col=0;col<8;col++){
+    for(let row=0;row<2;row++){
+      const isWhite=(col+row)%2===0;
+      const sq=new THREE.Mesh(
+        new THREE.BoxGeometry(sqW,0.07,1.6),
+        new THREE.MeshBasicMaterial({color:isWhite?0xFFFFFF:0x111111})
+      );
+      const offset=(col-3.5)*sqW;
+      const rowOff=(row-0.5)*1.6;
+      sq.position.set(
+        s0.x + rn0.x*offset + sd.x*rowOff,
+        0.09,
+        s0.z + rn0.z*offset + sd.z*rowOff
+      );
+      sq.rotation.y=angle0;
+      scene.add(sq);
+    }
+  }
+
+  // Gantry arch over the start/finish line
+  const gantryW=W*2+4;
+  const poleH=10;
+  const poleR=0.5;
+  const poleMat=new THREE.MeshLambertMaterial({color:0xCCCCCC});
+  const redMat=new THREE.MeshLambertMaterial({color:0xDD2222});
+  const signMat=new THREE.MeshLambertMaterial({color:0x111111});
+
+  // Two vertical poles
+  for(const s of[-1,1]){
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(poleR,poleR,poleH,10),poleMat);
+    pole.position.set(
+      s0.x + rn0.x*(gantryW/2)*s,
+      poleH/2,
+      s0.z + rn0.z*(gantryW/2)*s
+    );
+    scene.add(pole);
+
+    // Red/white stripe rings on pole
+    for(let h=1;h<poleH;h+=2){
+      const ring=new THREE.Mesh(new THREE.CylinderGeometry(poleR+0.05,poleR+0.05,0.6,10),redMat);
+      ring.position.set(pole.position.x, h, pole.position.z);
+      scene.add(ring);
+    }
+  }
+
+  // Horizontal crossbar
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(gantryW+poleR*2,1.2,1.2),poleMat);
+  bar.position.set(s0.x, poleH, s0.z);
+  bar.rotation.y=angle0;
+  scene.add(bar);
+
+  // "START / FINISH" sign hanging from crossbar
+  const sign=new THREE.Mesh(new THREE.BoxGeometry(gantryW*0.55,2.2,0.25),signMat);
+  sign.position.set(s0.x, poleH-1.5, s0.z);
+  sign.rotation.y=angle0;
+  scene.add(sign);
+
+  // Chequered flag panels on sign
+  const flagSqW=(gantryW*0.55)/8;
+  for(let col=0;col<8;col++){
+    for(let row=0;row<2;row++){
+      const isW=(col+row)%2===0;
+      const fs=new THREE.Mesh(
+        new THREE.BoxGeometry(flagSqW,1.0,0.27),
+        new THREE.MeshBasicMaterial({color:isW?0xFFFFFF:0x222222})
+      );
+      const off=(col-3.5)*flagSqW;
+      const roff=(row-0.5)*1.0;
+      fs.position.set(
+        s0.x + rn0.x*off,
+        poleH-1.5+roff,
+        s0.z + rn0.z*off
+      );
+      fs.rotation.y=angle0;
+      scene.add(fs);
+    }
+  }
+
+  // Red warning lights on crossbar ends
+  for(const s of[-1,1]){
+    const light=new THREE.Mesh(new THREE.SphereGeometry(0.55,8,6),
+      new THREE.MeshBasicMaterial({color:0xFF3300}));
+    light.position.set(
+      s0.x + rn0.x*(gantryW/2-1)*s,
+      poleH+0.3,
+      s0.z + rn0.z*(gantryW/2-1)*s
+    );
+    scene.add(light);
+  }
+
+  // ── 6. CHICANE BOLLARDS along both edges ─────────────────────────────────
+  // Red/white striped posts placed well outside the kerbs, purely decorative
+  for(let i=0;i<N;i+=2){
+    const c=pts[i], r=getRN(i);
+    for(const s of[-1,1]){
+      const post=new THREE.Group();
+      const pole=new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28,0.32,2.8,8),
+        new THREE.MeshLambertMaterial({color:i%4===0?0xDD2222:0xEEEEEE})
+      );
+      pole.position.y=1.4;
+      post.add(pole);
+      const band=new THREE.Mesh(
+        new THREE.CylinderGeometry(0.30,0.30,0.55,8),
+        new THREE.MeshLambertMaterial({color:i%4===0?0xEEEEEE:0xDD2222})
+      );
+      band.position.y=1.8;
+      post.add(band);
+      const base=new THREE.Mesh(
+        new THREE.CylinderGeometry(0.55,0.7,0.35,8),
+        new THREE.MeshLambertMaterial({color:0xFF6600})
+      );
+      base.position.y=0.18;
+      post.add(base);
+      // Place bollards 4 units outside the kerb edge — clear of the road
+      post.position.set(
+        c.x + r.x*(W+KERB+4.5)*s,
+        0,
+        c.z + r.z*(W+KERB+4.5)*s
+      );
+      post.castShadow=true;
+      scene.add(post);
+    }
+  }
+
+  // (barriers removed — bollards + kerbs provide visual edge marking)
+}
+
+// ── DECORATIONS ──────────────────────────────────────────────────────────
+function buildDecos(tk){
+  for(let i=0;i<55;i++){
+    let x,z,tries=0;
+    do{
+      x=(Math.random()-.5)*480; z=(Math.random()-.5)*420; tries++;
+      // avoid track area
+    }while(tries<20 && trackPts.some(p=>Math.hypot(x-p.x,z-p.z)<22));
+
+    if(tk.id==='snow'){
+      // Pine tree (cone + trunk)
+      const h=3.5+Math.random()*5;
+      const tree=new THREE.Group();
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.25,.3,1.2,6),
+        new THREE.MeshLambertMaterial({color:0x886644}));
+      trunk.position.y=.6;
+      tree.add(trunk);
+      const cone=new THREE.Mesh(new THREE.ConeGeometry(1.3+Math.random()*.5,h,7),
+        new THREE.MeshLambertMaterial({color:0xCCEEFF}));
+      cone.position.y=1.2+h/2;
+      tree.add(cone);
+      // Snow cap
+      const cap=new THREE.Mesh(new THREE.ConeGeometry(.6,.9,6),
+        new THREE.MeshLambertMaterial({color:0xFFFFFF}));
+      cap.position.y=1.2+h;
+      tree.add(cap);
+      tree.position.set(x,0,z);
+      scene.add(tree);
+    } else if(tk.id==='forest'){
+      const h=4+Math.random()*9;
+      const tree=new THREE.Group();
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.28,.4,1.5,6),
+        new THREE.MeshLambertMaterial({color:0x4a2a10}));
+      trunk.position.y=.75;
+      tree.add(trunk);
+      const gcol=new THREE.Color(0x0a3a0a);
+      gcol.addScalar(Math.random()*.12);
+      const cone=new THREE.Mesh(new THREE.ConeGeometry(1.5+Math.random(),h,7),
+        new THREE.MeshLambertMaterial({color:gcol}));
+      cone.position.y=1.5+h/2;
+      tree.add(cone);
+      tree.position.set(x,0,z);
+      scene.add(tree);
+    } else {
+      // Grass tuft / flower
+      const col=[0x33AA33,0x55CC22,0xFFFF44,0xFF88AA][Math.floor(Math.random()*4)];
+      const b=new THREE.Mesh(
+        new THREE.SphereGeometry(.6+Math.random()*.9,7,5),
+        new THREE.MeshLambertMaterial({color:col})
+      );
+      b.position.set(x,.6,z);
+      scene.add(b);
+    }
+  }
+}
+
+// ── KART MESH ─────────────────────────────────────────────────────────────
+function makeKart(col,acc){
+  const g=new THREE.Group();
+  // Body
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2.8,1,4),
+    new THREE.MeshLambertMaterial({color:col}));
+  body.position.y=.7; body.castShadow=true; g.add(body);
+  // Nose accent
+  const nose=new THREE.Mesh(new THREE.BoxGeometry(2,0.7,1.3),
+    new THREE.MeshLambertMaterial({color:acc}));
+  nose.position.set(0,.55,2.4); g.add(nose);
+  // Goose body
+  const gb=new THREE.Mesh(new THREE.SphereGeometry(.75,9,7),
+    new THREE.MeshLambertMaterial({color:0xF5F0DC}));
+  gb.scale.y=1.25; gb.position.set(0,2,0.2); g.add(gb);
+  // Head
+  const gh=new THREE.Mesh(new THREE.SphereGeometry(.42,8,6),
+    new THREE.MeshLambertMaterial({color:0xF5F0DC}));
+  gh.position.set(0,2.9,0.85); g.add(gh);
+  // Beak
+  const bk=new THREE.Mesh(new THREE.ConeGeometry(.14,.5,5),
+    new THREE.MeshLambertMaterial({color:0xFF9900}));
+  bk.rotation.x=Math.PI/2; bk.position.set(0,2.8,1.4); g.add(bk);
+  // Eyes
+  for(const sx of[-.25,.25]){
+    const ey=new THREE.Mesh(new THREE.SphereGeometry(.07,5,5),
+      new THREE.MeshBasicMaterial({color:0x111111}));
+    ey.position.set(sx,3.05,1.2); g.add(ey);
+  }
+  // Wheels
+  for(const [wx,wz] of[[-1.55,1.35],[1.55,1.35],[-1.55,-1.35],[1.55,-1.35]]){
+    const wh=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.45,10),
+      new THREE.MeshLambertMaterial({color:0x222222}));
+    wh.rotation.z=Math.PI/2; wh.position.set(wx,.45,wz); g.add(wh);
+  }
+  return g;
+}
+
+// ── KART SPAWN ────────────────────────────────────────────────────────────
+function spawnKarts(){
+  const ch=selChar;
+
+  // Compute the forward direction at the start (pt[0] → pt[1])
+  const p0=trackPts[0], p1=trackPts[1];
+  const fwd=new THREE.Vector3().subVectors(p1,p0).normalize();
+  const startAngle=Math.atan2(-fwd.x,-fwd.z); // angle kart faces forward
+  const right=new THREE.Vector3(-fwd.z,0,fwd.x); // perpendicular right
+
+  // Grid positions: 2 columns × 2 rows, staggered behind start line
+  // col -1 = left lane, col +1 = right lane; row 0 = front, row 1 = back
+  const grid=[
+    {col: 1, row:0},  // slot 0: front-right  → player
+    {col:-1, row:0},  // slot 1: front-left   → bot 1
+    {col: 1, row:1},  // slot 2: back-right   → bot 2
+    {col:-1, row:1},  // slot 3: back-left    → bot 3
+  ];
+
+  function gridPos(slot){
+    const g=grid[slot];
+    return new THREE.Vector3(
+      p0.x + right.x*g.col*5 - fwd.x*(g.row*8+4),
+      0,
+      p0.z + right.z*g.col*5 - fwd.z*(g.row*8+4)
+    );
+  }
+
+  player={
+    mesh:makeKart(ch.color,ch.accent),
+    pos:gridPos(0),
+    angle:startAngle, spd:0,
+    cp:0, lap:1, cpTotal:0, totalCPs:0, done:false,
+    abReady:true, abCd:0,
+  };
+  player.mesh.position.copy(player.pos);
+  player.mesh.rotation.y=startAngle;
+  scene.add(player.mesh);
+
+  const others=CHARS.filter(c=>c.id!==ch.id);
+  others.slice(0,3).forEach((bc,i)=>{
+    const bot={
+      mesh:makeKart(bc.color,bc.accent),
+      pos:gridPos(i+1),
+      angle:startAngle, spd:0,
+      cp:0, lap:1, cpTotal:0, totalCPs:0, done:false,
+      stunned:0, boost:0,
+      char:bc,
+      aiTgt:5,
+      aiWander:0,
+      abReady:true, abCd:0,
+    };
+    bot.mesh.position.copy(bot.pos);
+    bot.mesh.rotation.y=startAngle;
+    scene.add(bot.mesh);
+    bots.push(bot);
+  });
+}
+
+// ── PHYSICS ───────────────────────────────────────────────────────────────
+const MAXSPD=.65, ACC=.022, BRK=.038, FRIC=.014, TURN=.038;
+
+function updatePlayer(dt){
+  const k=player;
+  if(!racing||finished||cdActive) return;
+
+  const ms=k.boost>0?MAXSPD*k.char.spd*1.7:MAXSPD*k.char.spd;
+  if(k.stunned>0){ k.stunned-=dt*1000; k.spd*=.9; }
+  else {
+    if(k.boost>0) k.boost-=dt*1000;
+    if(keys['KeyW']||keys['ArrowUp'])   k.spd=Math.min(k.spd+ACC,ms);
+    else if(keys['KeyS']||keys['ArrowDown']) k.spd=Math.max(k.spd-BRK,-ms*.35);
+    else { k.spd*=(1-FRIC); if(Math.abs(k.spd)<.001) k.spd=0; }
+    const tr=TURN*k.char.hdl*Math.min(Math.abs(k.spd)/MAXSPD+.3,1);
+    if(keys['KeyA']||keys['ArrowLeft'])  k.angle+=tr;
+    if(keys['KeyD']||keys['ArrowRight']) k.angle-=tr;
+  }
+
+  k.pos.x-=Math.sin(k.angle)*k.spd;
+  k.pos.z-=Math.cos(k.angle)*k.spd;
+  k.mesh.position.copy(k.pos);
+  k.mesh.position.y=0;
+  k.mesh.rotation.y=k.angle;
+  tickAbilityCooldown(k, dt);
+  checkCP(k,true);
+}
+
+function updateBot(b,dt){
+  const tgt=trackPts[b.aiTgt];
+  const dx=tgt.x-b.pos.x, dz=tgt.z-b.pos.z;
+  if(Math.sqrt(dx*dx+dz*dz)<7){
+    b.aiTgt=(b.aiTgt+5)%NCP;
+    if(Math.random()<.3) b.aiWander=(Math.random()-.5)*.4;
+  }
+  const ta=Math.atan2(-dx,-dz)+b.aiWander;
+  let da=ta-b.angle;
+  while(da>Math.PI) da-=Math.PI*2;
+  while(da<-Math.PI) da+=Math.PI*2;
+  b.angle+=Math.sign(da)*Math.min(Math.abs(da),TURN*b.char.hdl);
+
+  if(b.stunned>0){ b.stunned-=dt*1000; b.spd*=.88; }
+  else b.spd=Math.min(b.spd+ACC*.75,MAXSPD*b.char.spd*.88);
+
+  b.pos.x-=Math.sin(b.angle)*b.spd;
+  b.pos.z-=Math.cos(b.angle)*b.spd;
+  b.mesh.position.copy(b.pos);
+  b.mesh.position.y=0;
+  b.mesh.rotation.y=b.angle;
+  botAbilityAI(b, dt);
+  checkCP(b,false);
+}
+
+// ── KART COLLISION ────────────────────────────────────────────────────────
+// (handled by resolveCollisions() below near the game loop)
+
+function checkCP(k,isPlayer){
+  const next=(k.cp+1)%NCP;
+  if(Math.hypot(k.pos.x-trackPts[next].x,k.pos.z-trackPts[next].z)<8){
+    const prevCp=k.cp;
+    k.cp=next;
+    k.totalCPs++;          // always increases, used for position ranking
+
+    // Completed a lap: wrapped back to cp 0 from the end
+    if(prevCp===NCP-1 && k.cp===0){
+      k.lap++;
+      if(isPlayer){
+        if(k.lap>NLAPS){ endRace(); return; }
+        floatText(`🏁 LAP ${k.lap}!`,'#FFD700');
+      }
+    }
+  }
+}
+
+// ── POSITION ──────────────────────────────────────────────────────────────
+function getPos(){
+  const ps=player.totalCPs;
+  let pos=1;
+  for(const b of bots){ if(b.totalCPs>ps) pos++; }
+  return pos;
+}
+function updateProjs(dt){
+  for(let i=projs.length-1;i>=0;i--){
+    const p=projs[i];
+    p.life-=dt*1000;
+    p.pos.x+=p.dirX*1.1;
+    p.pos.z+=p.dirZ*1.1;
+    p.mesh.position.copy(p.pos);
+    p.mesh.rotation.y+=.25;
+    let hit=false;
+    for(const v of p.victims){
+      if(Math.hypot(p.pos.x-v.pos.x,p.pos.z-v.pos.z)<3.5){
+        v.stunned=2200;
+        hit=true; break;
+      }
+    }
+    if(hit||p.life<=0){ scene.remove(p.mesh); projs.splice(i,1); }
+  }
+}
+
+// ── SHOCKWAVE POOL ────────────────────────────────────────────────────────
+const shockwaves=[];
+
+function spawnShockwave(pos, col){
+  const geo=new THREE.RingGeometry(0.5, 1.5, 32);
+  const mat=new THREE.MeshBasicMaterial({color:col, side:THREE.DoubleSide, transparent:true, opacity:0.9});
+  const mesh=new THREE.Mesh(geo, mat);
+  mesh.rotation.x=-Math.PI/2;
+  mesh.position.set(pos.x, 0.3, pos.z);
+  scene.add(mesh);
+  shockwaves.push({mesh, radius:1.5, maxRadius:28, speed:38, mat});
+}
+
+function updateShockwaves(dt){
+  for(let i=shockwaves.length-1;i>=0;i--){
+    const sw=shockwaves[i];
+    sw.radius+=sw.speed*dt;
+    const t=sw.radius/sw.maxRadius;
+    sw.mat.opacity=0.85*(1-t);
+    const s=sw.radius/1.5;
+    sw.mesh.scale.set(s,s,s);
+
+    // Check if shockwave ring has reached any victim
+    if(sw.victims && sw.triggered){
+      for(const v of sw.victims){
+        if(!sw.triggered.has(v)){
+          const d=Math.hypot(v.pos.x-sw.origin.x, v.pos.z-sw.origin.z);
+          if(d<=sw.radius && d>=sw.radius-sw.speed*dt*2){
+            v.stunned=2000;
+            sw.triggered.add(v);
+          }
+        }
+      }
+    }
+
+    if(sw.radius>=sw.maxRadius){
+      scene.remove(sw.mesh);
+      sw.mat.dispose();
+      shockwaves.splice(i,1);
+    }
+  }
+}
+
+// ── ABILITIES ─────────────────────────────────────────────────────────────
+// Generic ability executor — works for player and bots alike
+function useAbility(kart, victims){
+  if(!kart.abReady) return;
+  kart.abReady=false;
+  kart.abCd=kart.char.cd;
+  const id=kart.char.id;
+  const isPlayer=(kart===player);
+
+  if(id==='honker'){
+    // MEGA HONK — expanding shockwave stuns anyone it reaches
+    spawnShockwave(kart.pos, 0xFFDD00);
+    // Stun logic handled by shockwave growth — we tag it with origin and victims
+    const sw=shockwaves[shockwaves.length-1];
+    sw.origin=kart.pos.clone();
+    sw.victims=victims;
+    sw.triggered=new Set();
+    if(isPlayer){ flashScreen('#FFD700',.45); floatText('💛 MEGA HONK!','#FFD700'); }
+    else { floatText3D('💛 HONK!', kart.pos); }
+  } else if(id==='grey'){
+    kart.boost=3000;
+    if(isPlayer){ flashScreen('#7DF9FF',.3); floatText('❄️ ICE GLIDE!','#7DF9FF'); }
+    else { floatText3D('❄️', kart.pos); }
+  } else if(id==='canada'){
+    // Feather blast — shoot projectile in kart's forward direction
+    const pm={
+      mesh:new THREE.Mesh(
+        new THREE.SphereGeometry(.55,6,4),
+        new THREE.MeshBasicMaterial({color:0xFFFFFF})
+      ),
+      pos:kart.pos.clone(),
+      dirX:-Math.sin(kart.angle),
+      dirZ:-Math.cos(kart.angle),
+      life:3000,
+      owner:kart,
+      victims,
+    };
+    scene.add(pm.mesh);
+    projs.push(pm);
+    if(isPlayer){ flashScreen('#FFFFFF',.25); floatText('🪶 FEATHERS!','#fff'); }
+    else { floatText3D('🪶', kart.pos); }
+  } else { // golden
+    kart.boost=4500;
+    if(isPlayer){ flashScreen('#FFD700',.55); floatText('⭐ GOLDEN SPRINT!','#FFD700'); }
+    else { floatText3D('⭐', kart.pos); }
+  }
+}
+
+// Cooldown ticker for any kart
+function tickAbilityCooldown(kart, dt){
+  if(!kart.abReady){
+    kart.abCd=Math.max(0, kart.abCd-dt*1000);
+    if(kart.abCd<=0) kart.abReady=true;
+  }
+}
+
+// 3D floating emoji above a world position (for bots)
+function floatText3D(txt, worldPos){
+  if(!camera) return;
+  // Project 3D pos to screen
+  const v=new THREE.Vector3(worldPos.x, 4, worldPos.z);
+  v.project(camera);
+  const x=(v.x*.5+.5)*window.innerWidth;
+  const y=(-.5*v.y+.5)*window.innerHeight;
+  const d=document.createElement('div');
+  d.style.cssText=`position:fixed;left:${x}px;top:${y}px;transform:translate(-50%,-50%);
+    font-size:30px;pointer-events:none;z-index:80;animation:ft 1s ease forwards;`;
+  d.textContent=txt;
+  if(!document.getElementById('ftStyle')){
+    const s=document.createElement('style');
+    s.id='ftStyle';
+    s.textContent='@keyframes ft{0%{transform:translate(-50%,-50%) scale(.5);opacity:1}100%{transform:translate(-50%,-130%) scale(1.1);opacity:0}}';
+    document.head.appendChild(s);
+  }
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+
+function fireAbility(){
+  if(!racing||finished||cdActive||!player.abReady) return;
+  useAbility(player, bots);
+  // Update player HUD cooldown bar
+  abReady=player.abReady; abCd=player.abCd;
+}
+
+function flashScreen(col,op){
+  const el=document.getElementById('flash');
+  el.style.background=col; el.style.opacity=op;
+  setTimeout(()=>el.style.opacity=0,280);
+}
+
+function floatText(txt,col){
+  const d=document.createElement('div');
+  d.style.cssText=`position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);
+    font-size:46px;font-weight:900;color:${col};text-shadow:3px 3px 0 #000;
+    pointer-events:none;z-index:80;animation:ft 1s ease forwards;`;
+  d.textContent=txt;
+  if(!document.getElementById('ftStyle')){
+    const s=document.createElement('style');
+    s.id='ftStyle';
+    s.textContent='@keyframes ft{0%{transform:translate(-50%,-50%) scale(.5);opacity:1}100%{transform:translate(-50%,-80%) scale(1.2);opacity:0}}';
+    document.head.appendChild(s);
+  }
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+
+// Bot ability AI — fire when ready and a victim is nearby
+function botAbilityAI(bot, dt){
+  tickAbilityCooldown(bot, dt);
+  if(!bot.abReady) return;
+  const others=[player,...bots.filter(b=>b!==bot)];
+  const nearby=others.some(k=>Math.hypot(bot.pos.x-k.pos.x,bot.pos.z-k.pos.z)<20);
+  // Fire if someone is close, or just fire randomly (golden sprint / ice glide)
+  const alwaysFire=['grey','golden'].includes(bot.char.id);
+  if(nearby || (alwaysFire && Math.random()<0.008)){
+    useAbility(bot, others);
+  }
+}
+
+// ── MINIMAP ───────────────────────────────────────────────────────────────
+function drawMinimap(){
+  const c=mmCtx,W=110,H=110,sc=0.50;
+  c.clearRect(0,0,W,H);
+  c.fillStyle='rgba(0,0,0,.72)'; c.fillRect(0,0,W,H);
+  // track outline
+  c.strokeStyle='#888'; c.lineWidth=5;
+  c.beginPath();
+  trackPts.forEach((p,i)=>{
+    const x=W/2+p.x*sc, y=H/2+p.z*sc;
+    i===0?c.moveTo(x,y):c.lineTo(x,y);
+  });
+  c.closePath(); c.stroke();
+  // bots
+  c.fillStyle='#FF5555';
+  for(const b of bots){
+    c.beginPath(); c.arc(W/2+b.pos.x*sc,H/2+b.pos.z*sc,3.5,0,Math.PI*2); c.fill();
+  }
+  // player
+  c.fillStyle='#FFD700';
+  c.beginPath(); c.arc(W/2+player.pos.x*sc,H/2+player.pos.z*sc,5,0,Math.PI*2); c.fill();
+}
+
+// ── CAMERA ────────────────────────────────────────────────────────────────
+function updateCam(){
+  // Top-down follow: camera directly above + slightly behind player direction
+  // Position camera behind the car, looking forward over it
+  const ox=Math.sin(player.angle)*22;
+  const oz=Math.cos(player.angle)*22;
+  camera.position.set(player.pos.x+ox, 28, player.pos.z+oz);
+  // Look slightly ahead of the car, not at the car itself
+  const lx=player.pos.x - Math.sin(player.angle)*8;
+  const lz=player.pos.z - Math.cos(player.angle)*8;
+  camera.lookAt(lx, 0, lz);
+}
+
+// ── HUD UPDATE ────────────────────────────────────────────────────────────
+function updateHUD(dt){
+  raceTime+=dt;
+  const displayLap=Math.min(player.lap, NLAPS);
+  document.getElementById('lapd').textContent=`LAP ${displayLap}/${NLAPS}`;
+  document.getElementById('posd').textContent=`POS ${getPos()}/4`;
+  document.getElementById('spdd').textContent=`${Math.round(Math.abs(player.spd)*200)} km/h`;
+  if(!player.abReady){
+    document.getElementById('abfill').style.width=((1-player.abCd/selChar.cd)*100)+'%';
+  } else {
+    document.getElementById('abfill').style.width='100%';
+  }
+}
+
+// ── FINISH ────────────────────────────────────────────────────────────────
+function endRace(){
+  if(finished) return;
+  finished=true; player.done=true;
+  const pos=getPos();
+  const m=Math.floor(raceTime/60), s=(raceTime%60).toFixed(2);
+  const labels=['🥇 1ST PLACE!','🥈 2ND PLACE','🥉 3RD PLACE','4TH PLACE'];
+  document.getElementById('fintitle').textContent=pos===1?'🏆 WINNER! HONK HONK!':'🏁 RACE OVER!';
+  document.getElementById('finpos').textContent=labels[pos-1]||`${pos}TH`;
+  document.getElementById('fintm').textContent=`Time: ${m}:${s.padStart(5,'0')}`;
+  document.getElementById('fin').style.display='flex';
+}
+
+// ── COUNTDOWN ────────────────────────────────────────────────────────────
+function startCD(){
+  cdActive=true;
+  const el=document.getElementById('cdtxt');
+  const seq=['3','2','1','HONK! 🪿'];
+  let i=0;
+  el.style.display='flex';
+  function tick(){
+    el.textContent=seq[i++];
+    if(i<seq.length) setTimeout(tick,900);
+    else setTimeout(()=>{ el.style.display='none'; cdActive=false; racing=true; },750);
+  }
+  tick();
+}
+
+// ── COLLISION ─────────────────────────────────────────────────────────────
+const KART_RADIUS = 2.6; // circle hitbox radius per kart
+
+function resolveCollisions(){
+  const allKarts = [player, ...bots];
+  const diam = KART_RADIUS * 2;
+
+  for(let i=0;i<allKarts.length;i++){
+    for(let j=i+1;j<allKarts.length;j++){
+      const a=allKarts[i], b=allKarts[j];
+      const dx=b.pos.x-a.pos.x;
+      const dz=b.pos.z-a.pos.z;
+      const dist=Math.sqrt(dx*dx+dz*dz);
+      if(dist<diam && dist>0.001){
+        // Normalised collision axis
+        const nx=dx/dist, nz=dz/dist;
+        // Overlap penetration
+        const overlap=(diam-dist)*0.55;
+        // Push apart equally
+        a.pos.x-=nx*overlap*0.5;
+        a.pos.z-=nz*overlap*0.5;
+        b.pos.x+=nx*overlap*0.5;
+        b.pos.z+=nz*overlap*0.5;
+
+        // Velocity component along collision axis
+        const aVel = -(Math.sin(a.angle)*a.spd);  // x component
+        const aVelZ= -(Math.cos(a.angle)*a.spd);  // z component
+        const bVel = -(Math.sin(b.angle)*b.spd);
+        const bVelZ= -(Math.cos(b.angle)*b.spd);
+
+        const aAlong = aVel*nx + aVelZ*nz; // dot product along collision normal
+        const bAlong = bVel*nx + bVelZ*nz;
+
+        // Only resolve if approaching
+        if(aAlong - bAlong > 0){
+          // Elastic-ish exchange with some energy loss
+          const restitution = 0.55;
+          const impulse = (aAlong - bAlong) * restitution;
+
+          // Translate impulse back into speed change for each kart
+          // Project impulse onto each kart's forward direction
+          const aFwdX=-Math.sin(a.angle), aFwdZ=-Math.cos(a.angle);
+          const bFwdX=-Math.sin(b.angle), bFwdZ=-Math.cos(b.angle);
+
+          const aImpulseProj = (nx*aFwdX + nz*aFwdZ) * impulse;
+          const bImpulseProj = (nx*bFwdX + nz*bFwdZ) * impulse;
+
+          a.spd -= aImpulseProj * 0.6;
+          b.spd += bImpulseProj * 0.6;
+
+          // Clamp speeds
+          const aMax=MAXSPD*a.char.spd*1.8;
+          const bMax=MAXSPD*b.char.spd*1.8;
+          a.spd=Math.max(-aMax*0.4, Math.min(aMax, a.spd));
+          b.spd=Math.max(-bMax*0.4, Math.min(bMax, b.spd));
+
+          // Apply a small lateral nudge so karts don't perfectly stack
+          const lateralA = (Math.random()-0.5)*0.08;
+          const lateralB = (Math.random()-0.5)*0.08;
+          a.angle += lateralA;
+          b.angle += lateralB;
+        }
+
+        // Update mesh positions immediately after push
+        a.mesh.position.copy(a.pos);
+        b.mesh.position.copy(b.pos);
+      }
+    }
+  }
+}
+
+
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(clock.getDelta(),.05);
+  try {
+    if(racing&&!finished&&!cdActive){
+      updatePlayer(dt);
+      bots.forEach(b=>updateBot(b,dt));
+      resolveCollisions();
+      updateProjs(dt);
+      updateShockwaves(dt);
+      updateHUD(dt);
+    }
+    updateCam();
+    drawMinimap();
+    renderer.render(scene,camera);
+  } catch(e){ console.error('Loop error:',e); }
+}
+
+// ── MENU ──────────────────────────────────────────────────────────────────
+(function setupMenu(){
+  let scid=CHARS[0].id, stid=TRACKS[0].id;
+
+  const cg=document.getElementById('cgrid');
+  CHARS.forEach(ch=>{
+    const d=document.createElement('div');
+    d.className='ccard'+(ch.id===scid?' sel':'');
+    d.innerHTML=`<div class="cemoji">${ch.emoji}</div>
+      <div class="cname">${ch.name}</div>
+      <div class="cabl">✨ ${ch.ability}</div>
+      <div class="cabl" style="color:#888">${ch.desc}</div>
+      <div style="color:#7DF9FF;font-size:11px;margin-top:4px">SPD ${Math.round(ch.spd*10)} HDL ${Math.round(ch.hdl*10)}</div>`;
+    d.onclick=()=>{ document.querySelectorAll('.ccard').forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); scid=ch.id; };
+    cg.appendChild(d);
+  });
+
+  const tg=document.getElementById('tgrid');
+  TRACKS.forEach(tk=>{
+    const d=document.createElement('div');
+    d.className='tcard'+(tk.id===stid?' sel':'');
+    d.innerHTML=`<div class="temoji">${tk.emoji}</div><div class="tname">${tk.name}</div>`;
+    d.onclick=()=>{ document.querySelectorAll('.tcard').forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); stid=tk.id; };
+    tg.appendChild(d);
+  });
+
+  document.getElementById('sbtn').onclick=()=>{
+    selChar=CHARS.find(c=>c.id===scid);
+    selTrack=TRACKS.find(t=>t.id===stid);
+    document.getElementById('menu').style.display='none';
+    // Show HUD
+    document.getElementById('hud').style.display='flex';
+    document.getElementById('trkind').style.display='block';
+    document.getElementById('trkind').textContent=`${selTrack.emoji} ${selTrack.name.toUpperCase()}`;
+    document.getElementById('abbar').style.display='flex';
+    document.getElementById('abicon').textContent=selChar.emoji;
+    document.getElementById('ablbl').innerHTML=selChar.ability+'<br><span style="color:#aaa;font-size:11px">SPACE</span>';
+    document.getElementById('minimap').style.display='block';
+    initScene();
+    window.addEventListener('resize',()=>{
+      camera.aspect=innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth,innerHeight);
+    });
+    loop();
+    startCD();
+  };
+})();
+
+window.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Space'){ e.preventDefault(); fireAbility(); }
+});
+window.addEventListener('keyup',e=>keys[e.code]=false);
+</script>
+</body>
+</html>

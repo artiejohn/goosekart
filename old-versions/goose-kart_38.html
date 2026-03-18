@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🪿 Honk Kart</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;}
+canvas#c{display:block;width:100vw;height:100vh;}
+#hud{position:fixed;top:12px;left:50%;transform:translateX(-50%);
+  display:none;gap:14px;align-items:center;}
+.hb{background:rgba(0,0,0,.72);border:2px solid #555;border-radius:10px;
+  padding:6px 18px;color:#fff;font-size:18px;font-weight:700;letter-spacing:1px;}
+#lapd{color:#FFD700;}#posd{color:#7DF9FF;}#spdd{color:#90EE90;}
+#abbar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  display:none;align-items:center;gap:10px;
+  background:rgba(0,0,0,.72);border:2px solid #FFD700;border-radius:14px;padding:8px 16px;}
+#abicon{font-size:28px;}
+#abcdw{width:110px;height:10px;background:#333;border-radius:5px;overflow:hidden;}
+#abfill{height:100%;width:100%;background:#FFD700;border-radius:5px;}
+#ablbl{color:#fff;font-size:13px;font-weight:700;}
+#minimap{position:fixed;bottom:20px;right:14px;display:none;border:2px solid #555;border-radius:8px;}
+#flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:60;transition:opacity .3s;}
+#cdtxt{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+  font-size:100px;font-weight:900;color:#FFD700;text-shadow:4px 4px 0 #000;z-index:70;}
+#trkind{position:fixed;top:14px;right:14px;display:none;
+  background:rgba(0,0,0,.7);color:#fff;padding:6px 14px;border-radius:8px;font-size:14px;}
+#menu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:rgba(0,0,0,.93);z-index:90;gap:14px;}
+#menu h1{font-size:52px;color:#FFD700;text-shadow:3px 3px 0 #000;}
+.mlbl{color:#aaa;font-size:13px;letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
+.cgrid,.tgrid{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.ccard,.tcard{background:#1a1a1a;border:2px solid #444;border-radius:12px;
+  padding:12px 16px;cursor:pointer;text-align:center;color:#fff;transition:all .15s;}
+.ccard:hover,.tcard:hover,.ccard.sel,.tcard.sel{border-color:#FFD700;background:#221f00;}
+.cemoji,.temoji{font-size:30px;}.cname,.tname{font-size:12px;font-weight:700;margin-top:4px;}
+.cabl{font-size:11px;color:#FFD700;margin-top:2px;}
+#sbtn{margin-top:8px;padding:14px 48px;font-size:20px;font-weight:900;
+  background:#FFD700;color:#000;border:none;border-radius:12px;cursor:pointer;}
+#sbtn:hover{background:#ffe840;}
+#fin{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;background:rgba(0,0,0,.88);z-index:90;gap:18px;}
+#fin h2{font-size:48px;color:#FFD700;}
+#finpos{font-size:32px;color:#fff;}#fintm{font-size:20px;color:#aaa;}
+#rbtn{padding:12px 40px;font-size:18px;font-weight:900;background:#FFD700;
+  color:#000;border:none;border-radius:10px;cursor:pointer;}
+#dbg{position:fixed;bottom:4px;left:4px;background:rgba(0,0,0,.8);color:#0f0;
+  font-size:11px;padding:3px 7px;z-index:999;font-family:monospace;pointer-events:none;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hb" id="lapd">LAP 1/3</div>
+  <div class="hb" id="posd">POS 1/4</div>
+  <div class="hb" id="spdd">0 km/h</div>
+</div>
+<div id="trkind"></div>
+<div id="abbar">
+  <div id="abicon">🪿</div>
+  <div id="abcdw"><div id="abfill"></div></div>
+  <div id="ablbl">ABILITY<br><span style="color:#aaa;font-size:11px">SPACE</span></div>
+</div>
+<canvas id="minimap" width="110" height="110"></canvas>
+<div id="flash"></div>
+<div id="cdtxt"></div>
+<div id="dbg"></div>
+<div id="menu">
+  <h1>🪿 HONK KART</h1>
+  <div style="color:#aaffaa;font-size:18px;letter-spacing:3px;">GOOSE GRAND PRIX</div>
+  <div class="mlbl">Choose Your Goose</div>
+  <div class="cgrid" id="cgrid"></div>
+  <div class="mlbl">Select Track</div>
+  <div class="tgrid" id="tgrid"></div>
+  <button id="sbtn">🪿 HONK TO START!</button>
+  <div style="color:#666;font-size:12px;">WASD / Arrow keys · SPACE for ability</div>
+</div>
+<div id="fin">
+  <h2 id="fintitle">🏁 RACE OVER!</h2>
+  <div id="finpos"></div><div id="fintm"></div>
+  <button id="rbtn" onclick="location.reload()">RACE AGAIN</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const CHARS=[
+  {id:'honker',name:'Sir Honks-a-Lot',emoji:'🪿',color:0xF5F0DC,accent:0xFFA500,
+   ability:'MEGA HONK',desc:'Shockwave stuns nearby racers',spd:1.0,hdl:1.0,cd:8000},
+  {id:'grey',  name:'Grey Feather',   emoji:'🦢',color:0xBBBBBB,accent:0x7DF9FF,
+   ability:'ICE GLIDE',  desc:'Burst of speed',              spd:1.15,hdl:0.85,cd:6000},
+  {id:'canada',name:'Goose Trudeau',  emoji:'🦆',color:0x2a2a2a,accent:0xFFFFFF,
+   ability:'FEATHER BLAST',desc:'Shoot feathers forward',    spd:0.95,hdl:1.1,cd:5000},
+  {id:'golden',name:'Golden Goose',   emoji:'⭐',color:0xFFCC00,accent:0xFF8800,
+   ability:'GOLDEN SPRINT',desc:'Massive speed burst',       spd:1.0,hdl:1.0,cd:10000},
+];
+const TRACKS=[
+  {id:'snow',  name:'Frosty Peaks',emoji:'❄️',
+   sky:0x8BBFD4,ground:0xEEF8FF,asphalt:0x445566,fog:0xAAD0E8,fogD:0.012,ambient:0x99BBCC,sun:0xCCDDFF},
+  {id:'forest',name:'Fern Forest', emoji:'🌲',
+   sky:0x0a1a0a,ground:0x0d5c0d,asphalt:0x1a1a1a,fog:0x0a1a0a,fogD:0.018,ambient:0x223322,sun:0x99BB77},
+  {id:'grass', name:'Meadow Mile', emoji:'🌿',
+   sky:0x5BB8FF,ground:0x2db832,asphalt:0x2a2a2a,fog:0x99DDFF,fogD:0.008,ambient:0x88BBFF,sun:0xFFFFCC},
+];
+const CTRL=[
+  [80,0],[92,26],[96,54],[84,76],[58,92],[26,98],[0,93],[-26,98],[-58,92],[-84,74],
+  [-96,44],[-96,8],[-88,-24],[-74,-54],[-54,-80],[-22,-95],[14,-92],[44,-80],[66,-55],[76,-28],
+];
+
+// ── GAME STATE ────────────────────────────────────────────────────────────────
+let scene,camera,renderer,clock;
+let trackPts=[],NCP=0;
+let player=null,bots=[],projs=[],shockwaves=[];
+let barrierSegs=[]; // [{ax,az,bx,bz}] — exact positions of every barrier panel edge
+let keys={},racing=false,finished=false,cdActive=false;
+let raceTime=0,raceStartTimer=0;
+let selChar=null,selTrack=null,mmCtx=null;
+const NLAPS=3, ROAD_W=13;
+const MAXSPD=0.65,ACC=0.022,BRK=0.038,FRIC=0.014,TURN=0.038;
+
+// ── TRACK ─────────────────────────────────────────────────────────────────────
+function makeTrackPts(){
+  const N=CTRL.length,STEPS=10,pts=[];
+  for(let i=0;i<N;i++){
+    const p0=CTRL[(i-1+N)%N],p1=CTRL[i],p2=CTRL[(i+1)%N],p3=CTRL[(i+2)%N];
+    for(let s=0;s<STEPS;s++){
+      const t=s/STEPS,t2=t*t,t3=t2*t;
+      pts.push(new THREE.Vector3(
+        0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
+        0,
+        0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)
+      ));
+    }
+  }
+  return pts;
+}
+
+// ── ROAD ──────────────────────────────────────────────────────────────────────
+function buildRoad(tk){
+  const pts=trackPts,N=pts.length,W=ROAD_W;
+  function rn(i){
+    const a=pts[i%N],b=pts[(i+1)%N],dx=b.x-a.x,dz=b.z-a.z,l=Math.sqrt(dx*dx+dz*dz)||1;
+    return {x:-dz/l,z:dx/l};
+  }
+  function makeRibbon(fn,y,col,basic){
+    const v=[],idx=[];
+    for(let i=0;i<=N;i++){
+      const p=pts[i%N],r=rn(i),q=fn(p,r);
+      v.push(q[0],y,q[1],q[2],y,q[3]);
+      if(i<N){const b=i*2;idx.push(b,b+2,b+1,b+1,b+2,b+3);}
+    }
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+    g.setIndex(idx);g.computeVertexNormals();
+    scene.add(new THREE.Mesh(g,basic?new THREE.MeshBasicMaterial({color:col}):new THREE.MeshLambertMaterial({color:col})));
+  }
+
+  // Gravel runoff
+  makeRibbon((p,r)=>[p.x-r.x*(W+1.8),p.z-r.z*(W+1.8),p.x-r.x*(W+8),p.z-r.z*(W+8)],0.01,tk.id==='snow'?0xBBCCBB:0x887755,false);
+  makeRibbon((p,r)=>[p.x+r.x*(W+1.8),p.z+r.z*(W+1.8),p.x+r.x*(W+8),p.z+r.z*(W+8)],0.01,tk.id==='snow'?0xBBCCBB:0x887755,false);
+
+  // Asphalt — MeshBasicMaterial so lighting can't wash out the dark colour
+  const darkAsphalt = tk.id==='snow' ? 0x1e2a3a : tk.id==='forest' ? 0x0e0e0e : 0x111111;
+  makeRibbon((p,r)=>[p.x-r.x*W,p.z-r.z*W,p.x+r.x*W,p.z+r.z*W],0.03,darkAsphalt,true);
+
+  // Alternating red/white kerb stripes — one quad per segment per side
+  const matRed=new THREE.MeshBasicMaterial({color:0xFF1111,side:THREE.DoubleSide});
+  const matWht=new THREE.MeshBasicMaterial({color:0xFFFFFF,side:THREE.DoubleSide});
+  for(let i=0;i<N;i++){
+    const p=pts[i%N],pn=pts[(i+1)%N],r=rn(i),r2=rn(i+1);
+    const mat=i%2===0?matRed:matWht;
+    for(const side of[-1,1]){
+      const sv=[
+        p.x +r.x*W*side,      0.07, p.z +r.z*W*side,
+        p.x +r.x*(W+3)*side,  0.07, p.z +r.z*(W+3)*side,
+        pn.x+r2.x*W*side,     0.07, pn.z+r2.z*W*side,
+        pn.x+r2.x*(W+3)*side, 0.07, pn.z+r2.z*(W+3)*side,
+      ];
+      const sg=new THREE.BufferGeometry();
+      sg.setAttribute('position',new THREE.Float32BufferAttribute(sv,3));
+      // DoubleSide material means winding doesn't matter, but set correctly anyway
+      sg.setIndex(side===-1?[0,2,1,1,2,3]:[0,1,2,1,3,2]);
+      sg.computeVertexNormals();
+      scene.add(new THREE.Mesh(sg,mat));
+    }
+  }
+
+  // Thick white edge lines
+  makeRibbon((p,r)=>[p.x-r.x*(W-1.0),p.z-r.z*(W-1.0),p.x-r.x*(W-0.05),p.z-r.z*(W-0.05)],0.08,0xFFFFFF,true);
+  makeRibbon((p,r)=>[p.x+r.x*(W-0.05),p.z+r.z*(W-0.05),p.x+r.x*(W-1.0),p.z+r.z*(W-1.0)],0.08,0xFFFFFF,true);
+
+  // Centre dashes (wider and more frequent)
+  const dv=[],di=[];
+  for(let i=0,c=0;i<N;i+=4,c++){
+    const p=pts[i],r=rn(i),pn=pts[(i+2)%N],r2=rn(i+2),b=c*4;
+    dv.push(p.x-r.x*0.4,0.08,p.z-r.z*0.4, p.x+r.x*0.4,0.08,p.z+r.z*0.4,
+            pn.x-r2.x*0.4,0.08,pn.z-r2.z*0.4, pn.x+r2.x*0.4,0.08,pn.z+r2.z*0.4);
+    di.push(b,b+2,b+1,b+1,b+2,b+3);
+  }
+  const dg=new THREE.BufferGeometry();
+  dg.setAttribute('position',new THREE.Float32BufferAttribute(dv,3));
+  dg.setIndex(di);dg.computeVertexNormals();
+  scene.add(new THREE.Mesh(dg,new THREE.MeshBasicMaterial({color:0xFFFFBB})));
+
+  // Start/finish line — bold chequered pattern centred on track
+  const s0=pts[0],s1=pts[1];
+  const fdx=s1.x-s0.x,fdz=s1.z-s0.z,fl=Math.sqrt(fdx*fdx+fdz*fdz)||1;
+  const fw={x:fdx/fl,z:fdz/fl},rt={x:-fw.z,z:fw.x};
+  const ang=Math.atan2(fw.x,fw.z);
+  const sqW=(W*2)/8;
+  for(let ci=0;ci<8;ci++){
+    const off=(ci-3.5)*sqW+sqW/2;  // offset from track centre along right-normal
+    const cx=s0.x+rt.x*off, cz=s0.z+rt.z*off;
+    const sq=new THREE.Mesh(new THREE.BoxGeometry(sqW*0.98,0.12,3.5),
+      new THREE.MeshBasicMaterial({color:ci%2===0?0xFFFFFF:0x111111}));
+    sq.position.set(cx,0.1,cz);sq.rotation.y=ang;scene.add(sq);
+  }
+
+  // Gantry
+  const gW=W*2+8;
+  const poleMat=new THREE.MeshLambertMaterial({color:0xCCCCCC});
+  const redMat=new THREE.MeshLambertMaterial({color:0xDD1111});
+  for(const s of[-1,1]){
+    // Striped pole
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,12,8),poleMat);
+    pole.position.set(s0.x+rt.x*(gW/2)*s,6,s0.z+rt.z*(gW/2)*s);scene.add(pole);
+    for(let h=1;h<12;h+=2.5){
+      const ring=new THREE.Mesh(new THREE.CylinderGeometry(0.52,0.52,0.7,8),redMat);
+      ring.position.set(s0.x+rt.x*(gW/2)*s,h,s0.z+rt.z*(gW/2)*s);scene.add(ring);
+    }
+    // Red warning light
+    const l=new THREE.Mesh(new THREE.SphereGeometry(0.5,8,6),new THREE.MeshBasicMaterial({color:0xFF2200}));
+    l.position.set(s0.x+rt.x*(gW/2-1)*s,12.8,s0.z+rt.z*(gW/2-1)*s);scene.add(l);
+  }
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(gW,1.2,1.2),poleMat);
+  bar.position.set(s0.x,12,s0.z);bar.rotation.y=ang;scene.add(bar);
+  // Chequered sign board
+  const signBase=new THREE.Mesh(new THREE.BoxGeometry(gW*0.65,2.5,0.25),new THREE.MeshBasicMaterial({color:0x111111}));
+  signBase.position.set(s0.x,10.2,s0.z);signBase.rotation.y=ang;scene.add(signBase);
+  const flagSqW=(gW*0.65)/8;
+  for(let c=0;c<8;c++) for(let row=0;row<2;row++){
+    const fs=new THREE.Mesh(new THREE.BoxGeometry(flagSqW*0.96,1.1,0.28),
+      new THREE.MeshBasicMaterial({color:(c+row)%2===0?0xFFFFFF:0x222222}));
+    fs.position.set(s0.x+rt.x*((c-3.5)*flagSqW+flagSqW/2),(row===0?9.7:10.8),s0.z+rt.z*((c-3.5)*flagSqW+flagSqW/2));
+    fs.rotation.y=ang;scene.add(fs);
+  }
+
+
+  // ── ARMCO BARRIERS + FENCE ───────────────────────────────────────────────
+  // Placed at W+3 (outer kerb edge) outward — exactly where the kerb stripe ends.
+  const BOFF = W + 3.15; // just outside the outer kerb edge
+  const armcoSilver = new THREE.MeshLambertMaterial({color:0xBBBBBB});
+  const armcoRed2   = new THREE.MeshLambertMaterial({color:0xCC1111});
+  const postMat     = new THREE.MeshLambertMaterial({color:0x444444});
+  const wireMat     = new THREE.MeshBasicMaterial({color:0x777777});
+
+  barrierSegs = []; // reset each time track is built
+
+  for(let i=0;i<N;i++){
+    const p  = pts[i%N],      pn = pts[(i+1)%N];
+    const r  = rn(i),         r2 = rn(i+1);
+
+    // Forward direction of this segment (for panel rotation)
+    const fdx = pn.x-p.x,    fdz = pn.z-p.z;
+    const flen = Math.sqrt(fdx*fdx+fdz*fdz)||1;
+    const segLen = flen;
+    // Rotation so BoxGeometry's Z-axis aligns with segment direction
+    const segAngle = Math.atan2(fdx, fdz);
+
+    for(const s of[-1,1]){
+      // Panel endpoints — same formula as kerb stripes
+      const ax = p.x  + r.x  * BOFF * s,  az = p.z  + r.z  * BOFF * s;
+      const bx = pn.x + r2.x * BOFF * s,  bz = pn.z + r2.z * BOFF * s;
+
+      // Store the inner face of the barrier as a collision segment
+      barrierSegs.push({ax, az, bx, bz});
+      // Centre of panel
+      const mx = (ax+bx)*0.5,  mz = (az+bz)*0.5;
+      // Actual length between the two endpoints
+      const plen = Math.sqrt((bx-ax)**2+(bz-az)**2)||1;
+      // Angle between the two endpoints
+      const pAngle = Math.atan2(bx-ax, bz-az);
+
+      // Armco panel colour — red accent every 4 segments
+      const mat = Math.floor(i/4)%6===0 ? armcoRed2 : armcoSilver;
+      // BoxGeometry: length along Z (plen), decent thickness along X (0.5) facing track, height 0.7
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, plen*1.02), mat);
+      panel.position.set(mx, 0.55, mz);
+      panel.rotation.y = pAngle;
+      scene.add(panel);
+
+      // Corrugation ridge — slightly wider, centred on panel face
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, plen*1.02), armcoSilver);
+      ridge.position.set(mx, 0.55, mz);
+      ridge.rotation.y = pAngle;
+      scene.add(ridge);
+
+      // Post every 4 segments
+      if(i%4===0){
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.4, 0.18), postMat);
+        post.position.set(ax, 1.2, az);
+        scene.add(post);
+
+        // 3 wire strands above barrier
+        const nx = pn.x + r2.x*BOFF*s,  nz = pn.z + r2.z*BOFF*s;
+        for(const wy of [1.25, 1.65, 2.05]){
+          const wg = new THREE.BufferGeometry();
+          wg.setAttribute('position', new THREE.Float32BufferAttribute([ax,wy,az, nx,wy,nz], 3));
+          scene.add(new THREE.LineSegments(wg, wireMat));
+        }
+      }
+    }
+  }
+}
+
+
+
+// ── DECOS ─────────────────────────────────────────────────────────────────────
+function buildDecos(tk){
+  const SAFE = 28; // minimum distance from any track point
+
+  function place(count, minDist, fn){
+    for(let i=0;i<count;i++){
+      let x,z,tries=0;
+      do{ x=(Math.random()-0.5)*440; z=(Math.random()-0.5)*400; tries++; }
+      while(tries<40 && trackPts.some(p=>Math.hypot(x-p.x,z-p.z)<minDist));
+      if(tries<40) fn(x,z);
+    }
+  }
+
+  // ── SNOW MAP ────────────────────────────────────────────────────────────────
+  if(tk.id==='snow'){
+    const mSnowW  = new THREE.MeshLambertMaterial({color:0xFFFFFF});
+    const mSnowB  = new THREE.MeshLambertMaterial({color:0xDDEEFF});
+    const mTrunk  = new THREE.MeshLambertMaterial({color:0x775533});
+    const mPine1  = new THREE.MeshLambertMaterial({color:0xBBDDFF});
+    const mPine2  = new THREE.MeshLambertMaterial({color:0xDDEEFF});
+    const mRock   = new THREE.MeshLambertMaterial({color:0x889999});
+    const mCarrot = new THREE.MeshBasicMaterial({color:0xFF6600});
+    const mCoal   = new THREE.MeshBasicMaterial({color:0x111111});
+    const mScarf  = new THREE.MeshLambertMaterial({color:0xCC2200});
+
+    // Snow pines — bigger and more of them
+    place(110, SAFE, (x,z)=>{
+      const sz = Math.floor(Math.random()*3);
+      const radii=[2.2,3.4,5.0], heights=[5,9,14], tH=[1.4,2.0,2.8];
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.55,tH[sz],6), mTrunk);
+      tr.position.set(x, tH[sz]*0.5, z); scene.add(tr);
+      const c1 = new THREE.Mesh(new THREE.ConeGeometry(radii[sz],heights[sz]*0.7,7), mPine1);
+      c1.position.set(x, tH[sz]+heights[sz]*0.35, z); scene.add(c1);
+      const c2 = new THREE.Mesh(new THREE.ConeGeometry(radii[sz]*0.6,heights[sz]*0.5,7), mPine2);
+      c2.position.set(x, tH[sz]+heights[sz]*0.62, z); scene.add(c2);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(radii[sz]*0.45,2.0,6), mSnowW);
+      cap.position.set(x, tH[sz]+heights[sz]*1.02, z); scene.add(cap);
+    });
+
+    // Snowmen — bigger scale range
+    place(30, SAFE, (x,z)=>{
+      const scale = 1.2 + Math.random()*1.0;
+      const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.9*scale,10,8), mSnowW);
+      b1.position.set(x, 0.9*scale, z); scene.add(b1);
+      const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.65*scale,10,8), mSnowW);
+      b2.position.set(x, 2.15*scale, z); scene.add(b2);
+      const b3 = new THREE.Mesh(new THREE.SphereGeometry(0.45*scale,10,8), mSnowW);
+      b3.position.set(x, 3.1*scale, z); scene.add(b3);
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.07*scale,0.45*scale,6), mCarrot);
+      nose.rotation.x = Math.PI/2; nose.position.set(x, 3.1*scale, z+0.45*scale); scene.add(nose);
+      for(const ex of[-0.15,0.15]){
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06*scale,5,4), mCoal);
+        eye.position.set(x+ex*scale, 3.22*scale, z+0.38*scale); scene.add(eye);
+      }
+      for(let b=0;b<3;b++){
+        const btn = new THREE.Mesh(new THREE.SphereGeometry(0.07*scale,5,4), mCoal);
+        btn.position.set(x, (2.5-b*0.25)*scale, z+0.6*scale); scene.add(btn);
+      }
+      const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.46*scale,0.1*scale,6,12), mScarf);
+      scarf.rotation.x = Math.PI/2; scarf.position.set(x, 2.75*scale, z); scene.add(scarf);
+      const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.55*scale,0.55*scale,0.1*scale,10), mCoal);
+      hatBrim.position.set(x, 3.52*scale, z); scene.add(hatBrim);
+      const hatTop = new THREE.Mesh(new THREE.CylinderGeometry(0.35*scale,0.35*scale,0.55*scale,10), mCoal);
+      hatTop.position.set(x, 3.82*scale, z); scene.add(hatTop);
+    });
+
+    // Snow piles / drifts — bigger
+    place(40, SAFE, (x,z)=>{
+      const w=3+Math.random()*3, h=0.8+Math.random()*1.2;
+      const pile = new THREE.Mesh(new THREE.SphereGeometry(1,8,5), mSnowW);
+      pile.scale.set(w,h,w*0.7+Math.random()*0.5);
+      pile.position.set(x, h*0.5, z); scene.add(pile);
+      const pile2 = new THREE.Mesh(new THREE.SphereGeometry(0.7,7,4), mSnowB);
+      pile2.scale.set(1.8,0.8,1.3);
+      pile2.position.set(x+(Math.random()-0.5)*3, 0.4, z+(Math.random()-0.5)*2); scene.add(pile2);
+    });
+
+    // Snow-covered rocks — bigger
+    place(25, SAFE, (x,z)=>{
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.8,0), mRock);
+      rock.scale.setScalar(1.0+Math.random()*1.2);
+      rock.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+      rock.position.set(x,0.5,z); scene.add(rock);
+      const snowcap = new THREE.Mesh(new THREE.SphereGeometry(0.7,7,4), mSnowW);
+      snowcap.scale.set(1.3,0.5,1.2); snowcap.position.set(x,1.1,z); scene.add(snowcap);
+    });
+
+    // Ice crystals
+    place(20, SAFE, (x,z)=>{
+      const mIce = new THREE.MeshLambertMaterial({color:0xAADDFF, transparent:true, opacity:0.75});
+      for(let c=0;c<4;c++){
+        const h=1.5+Math.random()*2.5;
+        const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.2+Math.random()*0.2, h, 5), mIce);
+        crystal.position.set(x+(Math.random()-0.5)*2.5, h*0.5, z+(Math.random()-0.5)*2.5);
+        crystal.rotation.y = Math.random()*Math.PI*2;
+        scene.add(crystal);
+      }
+    });
+
+    // Frozen pond patches
+    place(8, SAFE, (x,z)=>{
+      const mIcePond = new THREE.MeshBasicMaterial({color:0xCCEEFF, transparent:true, opacity:0.7});
+      const pond = new THREE.Mesh(new THREE.CylinderGeometry(4+Math.random()*3, 4+Math.random()*3, 0.08, 12), mIcePond);
+      pond.position.set(x, 0.05, z); scene.add(pond);
+      // crack lines
+      const mCrack = new THREE.MeshBasicMaterial({color:0x88AACC});
+      for(let cr=0;cr<3;cr++){
+        const crackMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.09, 3+Math.random()*3), mCrack);
+        crackMesh.position.set(x+(Math.random()-0.5)*3, 0.1, z+(Math.random()-0.5)*3);
+        crackMesh.rotation.y = Math.random()*Math.PI; scene.add(crackMesh);
+      }
+    });
+
+  // ── FOREST MAP ──────────────────────────────────────────────────────────────
+  } else if(tk.id==='forest'){
+    const mTrunk   = new THREE.MeshLambertMaterial({color:0x2d1205});
+    const mTrunkL  = new THREE.MeshLambertMaterial({color:0x3d1f08});
+    const mDark1   = new THREE.MeshLambertMaterial({color:0x071a07});
+    const mDark2   = new THREE.MeshLambertMaterial({color:0x0d2e0d});
+    const mMid     = new THREE.MeshLambertMaterial({color:0x1a5c0a});
+    const mStemM   = new THREE.MeshLambertMaterial({color:0xDDBB88});
+    const mMushrR  = new THREE.MeshLambertMaterial({color:0xCC2200});
+    const mMushrY  = new THREE.MeshLambertMaterial({color:0xDDAA00});
+    const mOrb     = new THREE.MeshBasicMaterial({color:0xAAFF44});
+    const mLog     = new THREE.MeshLambertMaterial({color:0x5a3010});
+    const mMoss    = new THREE.MeshLambertMaterial({color:0x2a6622});
+    const mFern    = new THREE.MeshLambertMaterial({color:0x1a4a10});
+
+    // Very dense trees — massively increased count, bigger sizes
+    place(750, SAFE, (x,z)=>{
+      const h = 9 + Math.random()*18;
+      const girth = 0.4+Math.random()*0.6;
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(girth*0.7,girth,h*0.18+0.8,7), mTrunk);
+      tr.position.set(x, (h*0.18+0.8)*0.5, z); scene.add(tr);
+      const tiers = [[0.38,0.55,mDark1],[0.55,0.42,mDark2],[0.72,0.28,mMid]];
+      tiers.forEach(([pct,size,mat])=>{
+        const r = (2.5+Math.random()*2.0)*(size+0.2);
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h*(size+0.1)*1.2, 7), mat);
+        cone.position.set(x, h*pct, z); scene.add(cone);
+      });
+    });
+
+    // Shrubs / undergrowth — dense coverage
+    place(230, SAFE, (x,z)=>{
+      const mShrub = Math.random()<0.5 ? mDark2 : mMid;
+      for(let b=0;b<4;b++){
+        const sc = 0.9+Math.random()*0.8;
+        const shrub = new THREE.Mesh(new THREE.SphereGeometry(sc,7,5), mShrub);
+        shrub.scale.y = 0.65;
+        shrub.position.set(x+(Math.random()-0.5)*3.5, sc*0.65, z+(Math.random()-0.5)*3.5);
+        scene.add(shrub);
+      }
+    });
+
+    // Mossy fallen logs — bigger
+    place(40, SAFE, (x,z)=>{
+      const len = 4+Math.random()*7;
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.55,len,8), mLog);
+      log.rotation.z = Math.PI/2; log.rotation.y = Math.random()*Math.PI;
+      log.position.set(x,0.4,z); scene.add(log);
+      const moss = new THREE.Mesh(new THREE.CylinderGeometry(0.47,0.56,len*0.8,8), mMoss);
+      moss.rotation.copy(log.rotation); moss.position.set(x,0.72,z); scene.add(moss);
+    });
+
+    // Mushrooms — bigger, more of them
+    place(60, SAFE, (x,z)=>{
+      const sc = 0.8+Math.random()*1.8;
+      const isRed = Math.random()<0.6;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.18*sc,0.25*sc,1.1*sc,7), mStemM);
+      stem.position.set(x,0.55*sc,z); scene.add(stem);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.9*sc,9,5), isRed?mMushrR:mMushrY);
+      cap.scale.y=0.45; cap.position.set(x,1.25*sc,z); scene.add(cap);
+      if(isRed) for(let d=0;d<3;d++){
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.12*sc,5,4), new THREE.MeshBasicMaterial({color:0xFFFFFF}));
+        const a=Math.random()*Math.PI*2, r2=0.45*sc;
+        dot.position.set(x+Math.cos(a)*r2, 1.3*sc, z+Math.sin(a)*r2); scene.add(dot);
+      }
+    });
+
+    // Fern clusters — bigger, more spread
+    place(80, SAFE, (x,z)=>{
+      for(let f=0;f<6;f++){
+        const fern = new THREE.Mesh(new THREE.ConeGeometry(0.8+Math.random()*0.5,1.8,5), mFern);
+        fern.rotation.x = 0.4+Math.random()*0.4;
+        fern.rotation.y = Math.random()*Math.PI*2;
+        fern.position.set(x+(Math.random()-0.5)*3, 0.6, z+(Math.random()-0.5)*3);
+        scene.add(fern);
+      }
+    });
+
+    // Mossy rocks
+    place(35, SAFE, (x,z)=>{
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2,0), mLog);
+      rock.scale.setScalar(0.8+Math.random()*1.0);
+      rock.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+      rock.position.set(x,0.6,z); scene.add(rock);
+      const moss = new THREE.Mesh(new THREE.SphereGeometry(1.0,8,5), mMoss);
+      moss.scale.set(1.0,0.35,1.0); moss.position.set(x,1.1,z); scene.add(moss);
+    });
+
+    // Firefly orbs — more, bigger
+    place(30, SAFE, (x,z)=>{
+      for(let o=0;o<4;o++){
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.25+Math.random()*0.18,6,4), mOrb);
+        orb.position.set(x+(Math.random()-0.5)*5, 1.2+Math.random()*5, z+(Math.random()-0.5)*5);
+        scene.add(orb);
+      }
+    });
+
+    // ── FOREST ANIMALS ──────────────────────────────────────────────────────
+    const mDeer    = new THREE.MeshLambertMaterial({color:0xCC8844});
+    const mDeerL   = new THREE.MeshLambertMaterial({color:0xEEAA66});
+    const mDeerN   = new THREE.MeshLambertMaterial({color:0xFFDDBB});
+    const mFox     = new THREE.MeshLambertMaterial({color:0xDD6622});
+    const mFoxW    = new THREE.MeshLambertMaterial({color:0xFFEEDD});
+    const mFoxBlk  = new THREE.MeshLambertMaterial({color:0x221100});
+    const mRabbit  = new THREE.MeshLambertMaterial({color:0xBBAA99});
+    const mOwl     = new THREE.MeshLambertMaterial({color:0x8B6914});
+    const mOwlL    = new THREE.MeshLambertMaterial({color:0xCCAA55});
+    const mOwlEye  = new THREE.MeshBasicMaterial({color:0xFFCC00});
+    const mOwlPupil= new THREE.MeshBasicMaterial({color:0x111100});
+    const mAnimalEye=new THREE.MeshBasicMaterial({color:0x111111});
+    const mAnimalEyeW=new THREE.MeshBasicMaterial({color:0xFFFFFF});
+
+    // Deer — 14 of them, detailed with antlers
+    place(14, SAFE+4, (x,z)=>{
+      const rot=Math.random()*Math.PI*2;
+      const sc=1.6+Math.random()*0.5;
+      const cr=Math.cos(rot), sr=Math.sin(rot);
+      const pr=-sr, pz2=cr;
+      // body
+      const body=new THREE.Mesh(new THREE.SphereGeometry(0.7*sc,9,7), mDeer);
+      body.scale.set(1.5,1.0,1.0); body.position.set(x, 1.6*sc, z); scene.add(body);
+      // belly patch
+      const belly=new THREE.Mesh(new THREE.SphereGeometry(0.55*sc,8,6), mDeerL);
+      belly.scale.set(1.1,0.5,0.8); belly.position.set(x, 1.3*sc, z); scene.add(belly);
+      // neck
+      const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.22*sc,0.3*sc,0.85*sc,6), mDeer);
+      neck.rotation.z=0.3; neck.rotation.y=rot;
+      neck.position.set(x+cr*0.8*sc, 2.1*sc, z+sr*0.8*sc); scene.add(neck);
+      // head
+      const head=new THREE.Mesh(new THREE.SphereGeometry(0.38*sc,8,7), mDeer);
+      head.scale.set(0.9,1.0,1.1);
+      head.position.set(x+cr*1.3*sc, 2.45*sc, z+sr*1.3*sc); scene.add(head);
+      // snout
+      const snout=new THREE.Mesh(new THREE.SphereGeometry(0.2*sc,7,6), mDeerN);
+      snout.scale.set(0.85,0.7,0.9);
+      snout.position.set(x+cr*1.68*sc, 2.3*sc, z+sr*1.68*sc); scene.add(snout);
+      // eyes
+      for(const side of[-1,1]){
+        const eyeW=new THREE.Mesh(new THREE.SphereGeometry(0.1*sc,6,5), mAnimalEyeW);
+        eyeW.position.set(x+cr*1.4*sc+pr*side*0.28*sc, 2.6*sc, z+sr*1.4*sc+pz2*side*0.28*sc);
+        scene.add(eyeW);
+        const eye=new THREE.Mesh(new THREE.SphereGeometry(0.065*sc,5,4), mAnimalEye);
+        eye.position.set(x+cr*1.45*sc+pr*side*0.28*sc, 2.6*sc, z+sr*1.45*sc+pz2*side*0.28*sc);
+        scene.add(eye);
+      }
+      // ears
+      for(const side of[-1,1]){
+        const ear=new THREE.Mesh(new THREE.ConeGeometry(0.14*sc,0.45*sc,5), mDeer);
+        ear.rotation.z=side*0.4;
+        ear.position.set(x+cr*1.3*sc+pr*side*0.42*sc, 2.85*sc, z+sr*1.3*sc+pz2*side*0.42*sc);
+        scene.add(ear);
+        const earInner=new THREE.Mesh(new THREE.ConeGeometry(0.08*sc,0.35*sc,5), mDeerN);
+        earInner.rotation.z=side*0.4;
+        earInner.position.set(x+cr*1.3*sc+pr*side*0.42*sc, 2.85*sc, z+sr*1.3*sc+pz2*side*0.42*sc);
+        scene.add(earInner);
+      }
+      // antlers (only on some — ~60% chance)
+      if(Math.random()<0.6){
+        const mAntler=new THREE.MeshLambertMaterial({color:0x8B5E3C});
+        for(const side of[-1,1]){
+          // main beam up
+          const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.05*sc,0.07*sc,1.2*sc,5), mAntler);
+          beam.rotation.z=side*0.35; beam.rotation.y=rot;
+          beam.position.set(x+cr*1.3*sc+pr*side*0.28*sc, 3.3*sc, z+sr*1.3*sc+pz2*side*0.28*sc);
+          scene.add(beam);
+          // tine branch
+          const tine=new THREE.Mesh(new THREE.CylinderGeometry(0.03*sc,0.05*sc,0.7*sc,5), mAntler);
+          tine.rotation.z=side*0.9; tine.rotation.y=rot+0.4;
+          tine.position.set(x+cr*1.3*sc+pr*side*0.4*sc, 3.7*sc, z+sr*1.3*sc+pz2*side*0.4*sc);
+          scene.add(tine);
+        }
+      }
+      // tail white spot
+      const tail=new THREE.Mesh(new THREE.SphereGeometry(0.2*sc,6,5), mDeerN);
+      tail.position.set(x-cr*1.0*sc, 1.9*sc, z-sr*1.0*sc); scene.add(tail);
+      // legs
+      for(const [lf,ls] of[[1,-1],[1,1],[-1,-1],[-1,1]]){
+        const upper=new THREE.Mesh(new THREE.CylinderGeometry(0.16*sc,0.13*sc,1.0*sc,5), mDeer);
+        const lx=cr*lf*0.55*sc - pr*ls*0.36*sc;
+        const lz2=sr*lf*0.55*sc - pz2*ls*0.36*sc;
+        upper.position.set(x+lx, 1.0*sc, z+lz2); scene.add(upper);
+        const lower=new THREE.Mesh(new THREE.CylinderGeometry(0.1*sc,0.08*sc,0.9*sc,5), mDeerL);
+        lower.position.set(x+lx, 0.3*sc, z+lz2); scene.add(lower);
+        // tiny hoof
+        const hoof=new THREE.Mesh(new THREE.CylinderGeometry(0.1*sc,0.11*sc,0.15*sc,5), mFoxBlk);
+        hoof.position.set(x+lx, -0.1*sc, z+lz2); scene.add(hoof);
+      }
+    });
+
+    // Foxes — 10 of them
+    place(10, SAFE+4, (x,z)=>{
+      const rot=Math.random()*Math.PI*2;
+      const sc=1.1+Math.random()*0.35;
+      const cr=Math.cos(rot), sr=Math.sin(rot);
+      const pr=-sr, pz2=cr;
+      // body
+      const body=new THREE.Mesh(new THREE.SphereGeometry(0.52*sc,8,6), mFox);
+      body.scale.set(1.5,0.85,1.0); body.position.set(x, 0.72*sc, z); scene.add(body);
+      // belly
+      const belly=new THREE.Mesh(new THREE.SphereGeometry(0.38*sc,7,5), mFoxW);
+      belly.scale.set(1.1,0.6,0.85); belly.position.set(x, 0.62*sc, z); scene.add(belly);
+      // neck
+      const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.17*sc,0.22*sc,0.45*sc,6), mFox);
+      neck.rotation.z=0.25; neck.rotation.y=rot;
+      neck.position.set(x+cr*0.65*sc, 1.08*sc, z+sr*0.65*sc); scene.add(neck);
+      // head
+      const head=new THREE.Mesh(new THREE.SphereGeometry(0.34*sc,8,7), mFox);
+      head.scale.set(1.0,0.9,1.15);
+      head.position.set(x+cr*1.0*sc, 1.3*sc, z+sr*1.0*sc); scene.add(head);
+      // muzzle (elongated pointy snout)
+      const muzzle=new THREE.Mesh(new THREE.ConeGeometry(0.18*sc,0.6*sc,5), mFox);
+      muzzle.rotation.z=Math.PI/2; muzzle.rotation.y=rot;
+      muzzle.position.set(x+cr*1.42*sc, 1.2*sc, z+sr*1.42*sc); scene.add(muzzle);
+      // white muzzle tip
+      const muzzleTip=new THREE.Mesh(new THREE.SphereGeometry(0.12*sc,6,5), mFoxW);
+      muzzleTip.position.set(x+cr*1.62*sc, 1.18*sc, z+sr*1.62*sc); scene.add(muzzleTip);
+      // nose
+      const nose=new THREE.Mesh(new THREE.SphereGeometry(0.07*sc,5,4), mFoxBlk);
+      nose.position.set(x+cr*1.72*sc, 1.23*sc, z+sr*1.72*sc); scene.add(nose);
+      // eyes
+      for(const side of[-1,1]){
+        const eye=new THREE.Mesh(new THREE.SphereGeometry(0.085*sc,6,5), mOwlEye);
+        eye.position.set(x+cr*1.1*sc+pr*side*0.22*sc, 1.42*sc, z+sr*1.1*sc+pz2*side*0.22*sc);
+        scene.add(eye);
+        const pupil=new THREE.Mesh(new THREE.SphereGeometry(0.05*sc,5,4), mAnimalEye);
+        pupil.position.set(x+cr*1.15*sc+pr*side*0.22*sc, 1.42*sc, z+sr*1.15*sc+pz2*side*0.22*sc);
+        scene.add(pupil);
+      }
+      // pointed ears
+      for(const side of[-1,1]){
+        const ear=new THREE.Mesh(new THREE.ConeGeometry(0.12*sc,0.4*sc,5), mFox);
+        ear.rotation.z=side*0.25;
+        ear.position.set(x+cr*1.02*sc+pr*side*0.25*sc, 1.68*sc, z+sr*1.02*sc+pz2*side*0.25*sc);
+        scene.add(ear);
+        const earInner=new THREE.Mesh(new THREE.ConeGeometry(0.06*sc,0.28*sc,5), mFoxBlk);
+        earInner.rotation.z=side*0.25;
+        earInner.position.set(x+cr*1.02*sc+pr*side*0.25*sc, 1.68*sc, z+sr*1.02*sc+pz2*side*0.25*sc);
+        scene.add(earInner);
+      }
+      // bushy tail
+      const tailBase=new THREE.Mesh(new THREE.CylinderGeometry(0.13*sc,0.18*sc,0.7*sc,6), mFox);
+      tailBase.rotation.x=0.9; tailBase.rotation.y=rot;
+      tailBase.position.set(x-cr*0.85*sc, 0.75*sc, z-sr*0.85*sc); scene.add(tailBase);
+      const tailBush=new THREE.Mesh(new THREE.SphereGeometry(0.38*sc,8,6), mFox);
+      tailBush.scale.set(0.85,0.9,1.0);
+      tailBush.position.set(x-cr*1.3*sc, 0.5*sc, z-sr*1.3*sc); scene.add(tailBush);
+      const tailTip=new THREE.Mesh(new THREE.SphereGeometry(0.22*sc,7,5), mFoxW);
+      tailTip.position.set(x-cr*1.55*sc, 0.42*sc, z-sr*1.55*sc); scene.add(tailTip);
+      // legs
+      for(const [lf,ls] of[[1,-1],[1,1],[-1,-1],[-1,1]]){
+        const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.09*sc,0.07*sc,0.65*sc,5), mFox);
+        const lx=cr*lf*0.42*sc - pr*ls*0.28*sc;
+        const lz2=sr*lf*0.42*sc - pz2*ls*0.28*sc;
+        leg.position.set(x+lx, 0.32*sc, z+lz2); scene.add(leg);
+        const paw=new THREE.Mesh(new THREE.SphereGeometry(0.1*sc,5,4), mFoxBlk);
+        paw.position.set(x+lx, 0.02*sc, z+lz2); scene.add(paw);
+      }
+    });
+
+    // Rabbits — 18 of them, small and cute
+    place(18, SAFE+2, (x,z)=>{
+      const rot=Math.random()*Math.PI*2;
+      const sc=0.7+Math.random()*0.4;
+      const cr=Math.cos(rot), sr=Math.sin(rot);
+      const pr=-sr, pz2=cr;
+      // body
+      const body=new THREE.Mesh(new THREE.SphereGeometry(0.45*sc,8,7), mRabbit);
+      body.scale.set(1.0,1.2,1.0); body.position.set(x, 0.58*sc, z); scene.add(body);
+      // head
+      const head=new THREE.Mesh(new THREE.SphereGeometry(0.32*sc,8,7), mRabbit);
+      head.position.set(x+cr*0.55*sc, 1.0*sc, z+sr*0.55*sc); scene.add(head);
+      // nose
+      const nose=new THREE.Mesh(new THREE.SphereGeometry(0.065*sc,5,4), new THREE.MeshLambertMaterial({color:0xFFAAAA}));
+      nose.position.set(x+cr*0.83*sc, 0.98*sc, z+sr*0.83*sc); scene.add(nose);
+      // eyes
+      for(const side of[-1,1]){
+        const eye=new THREE.Mesh(new THREE.SphereGeometry(0.075*sc,5,4), new THREE.MeshBasicMaterial({color:0xFF2222}));
+        eye.position.set(x+cr*0.62*sc+pr*side*0.22*sc, 1.08*sc, z+sr*0.62*sc+pz2*side*0.22*sc);
+        scene.add(eye);
+      }
+      // long ears
+      for(const side of[-1,1]){
+        const ear=new THREE.Mesh(new THREE.CylinderGeometry(0.07*sc,0.1*sc,0.75*sc,5), mRabbit);
+        ear.rotation.z=side*0.2;
+        ear.position.set(x+cr*0.55*sc+pr*side*0.2*sc, 1.55*sc, z+sr*0.55*sc+pz2*side*0.2*sc);
+        scene.add(ear);
+        const earInner=new THREE.Mesh(new THREE.CylinderGeometry(0.04*sc,0.06*sc,0.6*sc,5), new THREE.MeshLambertMaterial({color:0xFFAAAA}));
+        earInner.rotation.z=side*0.2;
+        earInner.position.set(x+cr*0.55*sc+pr*side*0.2*sc, 1.55*sc, z+sr*0.55*sc+pz2*side*0.2*sc);
+        scene.add(earInner);
+      }
+      // fluffy tail
+      const tail=new THREE.Mesh(new THREE.SphereGeometry(0.18*sc,6,5), new THREE.MeshLambertMaterial({color:0xFFFFFF}));
+      tail.position.set(x-cr*0.45*sc, 0.65*sc, z-sr*0.45*sc); scene.add(tail);
+      // legs
+      for(const side of[-1,1]){
+        const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.08*sc,0.07*sc,0.4*sc,5), mRabbit);
+        leg.position.set(x+pr*side*0.22*sc, 0.22*sc, z+pz2*side*0.22*sc); scene.add(leg);
+        // big back haunches
+        const haunch=new THREE.Mesh(new THREE.SphereGeometry(0.22*sc,7,5), mRabbit);
+        haunch.scale.set(0.8,1.0,1.3);
+        haunch.position.set(x-cr*0.25*sc+pr*side*0.28*sc, 0.42*sc, z-sr*0.25*sc+pz2*side*0.28*sc);
+        scene.add(haunch);
+      }
+    });
+
+    // Owls — 8 of them, perched on tree stumps/ground
+    place(8, SAFE+4, (x,z)=>{
+      const rot=Math.random()*Math.PI*2;
+      const sc=0.9+Math.random()*0.4;
+      // body — plump upright oval
+      const body=new THREE.Mesh(new THREE.SphereGeometry(0.42*sc,9,8), mOwl);
+      body.scale.set(1.0,1.3,1.0); body.position.set(x, 2.1*sc, z); scene.add(body);
+      // breast pattern
+      const breast=new THREE.Mesh(new THREE.SphereGeometry(0.32*sc,8,7), mOwlL);
+      breast.scale.set(0.8,1.0,0.7);
+      breast.position.set(x, 2.0*sc, z); scene.add(breast);
+      // wings
+      for(const side of[-1,1]){
+        const wing=new THREE.Mesh(new THREE.SphereGeometry(0.32*sc,7,6), mOwl);
+        wing.scale.set(0.4,1.1,0.9);
+        wing.position.set(x-Math.sin(rot)*side*0.45*sc, 2.1*sc, z+Math.cos(rot)*side*0.45*sc);
+        scene.add(wing);
+      }
+      // head — large round
+      const head=new THREE.Mesh(new THREE.SphereGeometry(0.38*sc,9,8), mOwl);
+      head.position.set(x, 2.82*sc, z); scene.add(head);
+      // facial disc
+      const face=new THREE.Mesh(new THREE.SphereGeometry(0.32*sc,8,7), mOwlL);
+      face.scale.set(0.9,0.9,0.5); face.position.set(x, 2.82*sc, z); scene.add(face);
+      // big eyes
+      for(const side of[-1,1]){
+        const eyeOuter=new THREE.Mesh(new THREE.SphereGeometry(0.14*sc,7,6), mOwlEye);
+        eyeOuter.position.set(x-Math.sin(rot)*side*0.2*sc, 2.92*sc, z+Math.cos(rot)*side*0.2*sc);
+        scene.add(eyeOuter);
+        const pupil=new THREE.Mesh(new THREE.SphereGeometry(0.09*sc,6,5), mOwlPupil);
+        pupil.position.set(x-Math.sin(rot)*side*0.2*sc, 2.92*sc, z+Math.cos(rot)*side*0.2*sc+0.1*sc);
+        scene.add(pupil);
+        // white eye ring
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(0.13*sc,0.03*sc,5,10), new THREE.MeshBasicMaterial({color:0xFFFFCC}));
+        ring.rotation.x=Math.PI/2;
+        ring.position.set(x-Math.sin(rot)*side*0.2*sc, 2.92*sc, z+Math.cos(rot)*side*0.2*sc);
+        scene.add(ring);
+      }
+      // beak
+      const beak=new THREE.Mesh(new THREE.ConeGeometry(0.07*sc,0.2*sc,4), new THREE.MeshLambertMaterial({color:0xCCAA33}));
+      beak.rotation.x=Math.PI/2;
+      beak.position.set(x, 2.75*sc, z+0.35*sc); scene.add(beak);
+      // ear tufts
+      for(const side of[-1,1]){
+        const tuft=new THREE.Mesh(new THREE.ConeGeometry(0.08*sc,0.3*sc,4), mOwl);
+        tuft.rotation.z=side*0.3;
+        tuft.position.set(x-Math.sin(rot)*side*0.22*sc, 3.22*sc, z+Math.cos(rot)*side*0.22*sc);
+        scene.add(tuft);
+      }
+      // feet/talons gripping
+      for(const side of[-1,1]){
+        const foot=new THREE.Mesh(new THREE.SphereGeometry(0.1*sc,6,5), mOwlPupil);
+        foot.scale.set(1.5,0.5,1.0);
+        foot.position.set(x-Math.sin(rot)*side*0.2*sc, 1.62*sc, z+Math.cos(rot)*side*0.2*sc);
+        scene.add(foot);
+      }
+      // stump to sit on
+      const stump=new THREE.Mesh(new THREE.CylinderGeometry(0.5*sc,0.6*sc,1.5*sc,8), mLog);
+      stump.position.set(x,0.75*sc,z); scene.add(stump);
+      const stumpTop=new THREE.Mesh(new THREE.CylinderGeometry(0.52*sc,0.52*sc,0.1*sc,8), mMoss);
+      stumpTop.position.set(x,1.52*sc,z); scene.add(stumpTop);
+    });
+
+  // ── MEADOW MAP ──────────────────────────────────────────────────────────────
+  } else {
+    const mTrunk   = new THREE.MeshLambertMaterial({color:0x664422});
+    const mCanopy  = new THREE.MeshLambertMaterial({color:0x228822});
+    const mCanopy2 = new THREE.MeshLambertMaterial({color:0x33AA33});
+    const mBush    = new THREE.MeshLambertMaterial({color:0x22AA22});
+    const mFlower1 = new THREE.MeshLambertMaterial({color:0xFFDD00});
+    const mFlower2 = new THREE.MeshLambertMaterial({color:0xFF6688});
+    const mFlower3 = new THREE.MeshLambertMaterial({color:0xFF4400});
+    const mFlower4 = new THREE.MeshLambertMaterial({color:0xCC44FF});
+    const mHay     = new THREE.MeshLambertMaterial({color:0xCCA832});
+    const mHayDark = new THREE.MeshLambertMaterial({color:0xAA8820});
+    const mFence   = new THREE.MeshLambertMaterial({color:0xBB9955});
+    const mCow1    = new THREE.MeshLambertMaterial({color:0xEEEEEE});
+    const mCow2    = new THREE.MeshLambertMaterial({color:0x222222});
+    const mSheep   = new THREE.MeshLambertMaterial({color:0xF0EEE8});
+    const mSheepF  = new THREE.MeshLambertMaterial({color:0x333322});
+    const mChicken = new THREE.MeshLambertMaterial({color:0xFFDD88});
+    const mRed     = new THREE.MeshLambertMaterial({color:0xCC2200});
+    const mRock    = new THREE.MeshLambertMaterial({color:0x888877});
+
+    // Round canopy trees — bigger
+    place(45, SAFE, (x,z)=>{
+      const sc=1.4+Math.random()*1.2;
+      const tr=new THREE.Mesh(new THREE.CylinderGeometry(0.3*sc,0.45*sc,2.8*sc,7), mTrunk);
+      tr.position.set(x,1.4*sc,z); scene.add(tr);
+      const cn=new THREE.Mesh(new THREE.SphereGeometry(2.0*sc,9,6), Math.random()<0.5?mCanopy:mCanopy2);
+      cn.scale.set(1+Math.random()*0.3,0.85+Math.random()*0.3,1+Math.random()*0.3);
+      cn.position.set(x,4.5*sc,z); scene.add(cn);
+    });
+
+    // Hay bales — bigger
+    place(30, SAFE, (x,z)=>{
+      if(Math.random()<0.5){
+        const bale=new THREE.Mesh(new THREE.CylinderGeometry(1.8,1.8,2.2,12), mHay);
+        bale.rotation.z=Math.PI/2; bale.rotation.y=Math.random()*Math.PI;
+        bale.position.set(x,1.8,z); scene.add(bale);
+        const wrap=new THREE.Mesh(new THREE.CylinderGeometry(1.82,1.82,0.7,12), mHayDark);
+        wrap.rotation.z=Math.PI/2; wrap.rotation.y=bale.rotation.y;
+        wrap.position.set(x,1.8,z); scene.add(wrap);
+      } else {
+        const stacks=1+Math.floor(Math.random()*2);
+        for(let s=0;s<stacks;s++){
+          const bale=new THREE.Mesh(new THREE.BoxGeometry(3,1.8,1.8), mHay);
+          bale.position.set(x+(Math.random()-0.5)*0.5,0.9+s*1.8,z+(Math.random()-0.5)*0.5);
+          bale.rotation.y=Math.random()*0.3; scene.add(bale);
+          const line=new THREE.Mesh(new THREE.BoxGeometry(3.02,0.12,1.82), mHayDark);
+          line.position.copy(bale.position); line.position.y+=0.4;
+          line.rotation.copy(bale.rotation); scene.add(line);
+        }
+      }
+    });
+
+    // Cows — bigger, more detailed, properly assembled
+    place(22, SAFE, (x,z)=>{
+      const rot=Math.random()*Math.PI*2;
+      const sc=1.8+Math.random()*0.6;
+      const cr=Math.cos(rot), sr=Math.sin(rot);
+      // perpendicular direction for left/right offset
+      const pr=-sr, pz2=cr;
+      // body
+      const body=new THREE.Mesh(new THREE.BoxGeometry(2.6*sc,1.5*sc,1.3*sc), mCow1);
+      body.position.set(x, 1.4*sc, z); body.rotation.y=rot; scene.add(body);
+      // black patches on body
+      for(const [ox,oz2,oy] of[[0.3,0.1,0],[-0.4,-0.2,0.1]]){
+        const patch=new THREE.Mesh(new THREE.BoxGeometry(0.9*sc,0.85*sc,1.32*sc), mCow2);
+        patch.position.set(x+pr*ox*sc, 1.4*sc+oy*sc, z+pz2*ox*sc);
+        patch.rotation.y=rot; scene.add(patch);
+      }
+      // neck
+      const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.3*sc,0.38*sc,0.9*sc,7), mCow1);
+      neck.rotation.z=Math.PI*0.18; neck.rotation.y=rot;
+      neck.position.set(x+cr*1.1*sc, 1.9*sc, z+sr*1.1*sc); scene.add(neck);
+      // head
+      const head=new THREE.Mesh(new THREE.BoxGeometry(0.95*sc,0.9*sc,0.9*sc), mCow1);
+      head.position.set(x+cr*1.7*sc, 1.85*sc, z+sr*1.7*sc); scene.add(head);
+      // snout
+      const mSnout=new THREE.MeshLambertMaterial({color:0xFFCCCC});
+      const snout=new THREE.Mesh(new THREE.BoxGeometry(0.6*sc,0.48*sc,0.42*sc), mSnout);
+      snout.position.set(x+cr*2.2*sc, 1.68*sc, z+sr*2.2*sc); scene.add(snout);
+      // nostrils
+      const mNose=new THREE.MeshBasicMaterial({color:0xBB7777});
+      for(const side of[-1,1]){
+        const nostril=new THREE.Mesh(new THREE.SphereGeometry(0.07*sc,5,4), mNose);
+        nostril.position.set(x+cr*2.42*sc+pr*side*0.13*sc, 1.72*sc, z+sr*2.42*sc+pz2*side*0.13*sc);
+        scene.add(nostril);
+      }
+      // eyes
+      const mEye=new THREE.MeshBasicMaterial({color:0x111111});
+      for(const side of[-1,1]){
+        const eye=new THREE.Mesh(new THREE.SphereGeometry(0.1*sc,6,5), mEye);
+        eye.position.set(x+cr*1.82*sc+pr*side*0.38*sc, 2.1*sc, z+sr*1.82*sc+pz2*side*0.38*sc);
+        scene.add(eye);
+      }
+      // horns
+      const mHorn=new THREE.MeshLambertMaterial({color:0xFFEEAA});
+      for(const side of[-1,1]){
+        const horn=new THREE.Mesh(new THREE.ConeGeometry(0.09*sc,0.8*sc,5), mHorn);
+        horn.rotation.z=side*0.4; horn.rotation.y=rot;
+        horn.position.set(x+cr*1.7*sc+pr*side*0.35*sc, 2.55*sc, z+sr*1.7*sc+pz2*side*0.35*sc);
+        scene.add(horn);
+      }
+      // tail
+      const tail=new THREE.Mesh(new THREE.CylinderGeometry(0.07*sc,0.04*sc,0.9*sc,5), mCow1);
+      tail.rotation.x=0.7; tail.rotation.y=rot;
+      tail.position.set(x-cr*1.3*sc, 1.7*sc, z-sr*1.3*sc); scene.add(tail);
+      const tailTuft=new THREE.Mesh(new THREE.SphereGeometry(0.18*sc,6,5), mCow2);
+      tailTuft.position.set(x-cr*1.3*sc, 1.0*sc, z-sr*1.3*sc); scene.add(tailTuft);
+      // udder
+      const mUdder=new THREE.MeshLambertMaterial({color:0xFFBBBB});
+      const udder=new THREE.Mesh(new THREE.SphereGeometry(0.3*sc,7,5), mUdder);
+      udder.scale.set(1.2,0.6,0.8); udder.position.set(x, 0.7*sc, z); scene.add(udder);
+      // legs — properly rotated with body
+      for(const [lf,ls] of[[1,-1],[1,1],[-1,-1],[-1,1]]){
+        const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.23*sc,0.19*sc,1.4*sc,6), mCow1);
+        const lx=cr*lf*0.75*sc - pr*ls*0.42*sc;
+        const lz2=sr*lf*0.75*sc - pz2*ls*0.42*sc;
+        leg.position.set(x+lx, 0.7*sc, z+lz2); scene.add(leg);
+        // hoof
+        const hoof=new THREE.Mesh(new THREE.CylinderGeometry(0.21*sc,0.23*sc,0.22*sc,6), mCow2);
+        hoof.position.set(x+lx, 0.05*sc, z+lz2); scene.add(hoof);
+      }
+    });
+
+    // Sheep — bigger, fluffy, properly assembled
+    place(24, SAFE, (x,z)=>{
+      const rot=Math.random()*Math.PI*2;
+      const sc=1.6+Math.random()*0.5;
+      const cr=Math.cos(rot), sr=Math.sin(rot);
+      const pr=-sr, pz2=cr;
+      // main body wool
+      const body=new THREE.Mesh(new THREE.SphereGeometry(0.9*sc,10,8), mSheep);
+      body.scale.set(1.4,1.05,1.1); body.position.set(x,1.15*sc,z); scene.add(body);
+      // fluffy wool bumps all over body
+      for(let f=0;f<8;f++){
+        const a=f*Math.PI/4;
+        const bump=new THREE.Mesh(new THREE.SphereGeometry(0.45*sc,7,5), mSheep);
+        bump.position.set(
+          x+Math.cos(a)*0.7*sc, 1.35*sc+Math.abs(Math.sin(a))*0.2*sc,
+          z+Math.sin(a)*0.7*sc
+        ); scene.add(bump);
+      }
+      // neck
+      const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.22*sc,0.28*sc,0.55*sc,6), mSheepF);
+      neck.rotation.z=0.25; neck.rotation.y=rot;
+      neck.position.set(x+cr*0.95*sc, 1.55*sc, z+sr*0.95*sc); scene.add(neck);
+      // head
+      const head=new THREE.Mesh(new THREE.SphereGeometry(0.42*sc,9,7), mSheepF);
+      head.scale.set(0.9,1.0,1.1);
+      head.position.set(x+cr*1.35*sc, 1.6*sc, z+sr*1.35*sc); scene.add(head);
+      // snout
+      const mSheepSnout=new THREE.MeshLambertMaterial({color:0xBBAA99});
+      const snout=new THREE.Mesh(new THREE.SphereGeometry(0.22*sc,7,5), mSheepSnout);
+      snout.scale.set(0.9,0.7,0.8);
+      snout.position.set(x+cr*1.75*sc, 1.48*sc, z+sr*1.75*sc); scene.add(snout);
+      // eyes
+      const mEyeS=new THREE.MeshBasicMaterial({color:0x222211});
+      for(const side of[-1,1]){
+        const eye=new THREE.Mesh(new THREE.SphereGeometry(0.08*sc,6,5), mEyeS);
+        eye.position.set(x+cr*1.45*sc+pr*side*0.25*sc, 1.75*sc, z+sr*1.45*sc+pz2*side*0.25*sc);
+        scene.add(eye);
+      }
+      // ears
+      for(const side of[-1,1]){
+        const ear=new THREE.Mesh(new THREE.SphereGeometry(0.18*sc,6,5), mSheepF);
+        ear.scale.set(0.5,1.0,0.8);
+        ear.position.set(x+cr*1.35*sc+pr*side*0.48*sc, 1.85*sc, z+sr*1.35*sc+pz2*side*0.48*sc);
+        scene.add(ear);
+      }
+      // wool on head top
+      const headWool=new THREE.Mesh(new THREE.SphereGeometry(0.32*sc,7,6), mSheep);
+      headWool.position.set(x+cr*1.35*sc, 2.0*sc, z+sr*1.35*sc); scene.add(headWool);
+      // tail stump
+      const tail=new THREE.Mesh(new THREE.SphereGeometry(0.22*sc,6,5), mSheep);
+      tail.position.set(x-cr*1.15*sc, 1.4*sc, z-sr*1.15*sc); scene.add(tail);
+      // legs — correctly placed relative to body orientation
+      for(const [lf,ls] of[[1,-1],[1,1],[-1,-1],[-1,1]]){
+        const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.13*sc,0.11*sc,1.0*sc,5), mSheepF);
+        const lx=cr*lf*0.55*sc - pr*ls*0.38*sc;
+        const lz2=sr*lf*0.55*sc - pz2*ls*0.38*sc;
+        leg.position.set(x+lx, 0.5*sc, z+lz2); scene.add(leg);
+        // tiny hooves
+        const hoof=new THREE.Mesh(new THREE.CylinderGeometry(0.12*sc,0.13*sc,0.18*sc,5), mSheepF);
+        hoof.position.set(x+lx, 0.04*sc, z+lz2); scene.add(hoof);
+      }
+    });
+
+    // Chickens — bigger, more detailed, properly assembled
+    place(28, SAFE, (x,z)=>{
+      const rot=Math.random()*Math.PI*2;
+      const sc=1.8+Math.random()*0.6;
+      const cr=Math.cos(rot), sr=Math.sin(rot);
+      const pr=-sr, pz2=cr;
+      const mWattle=new THREE.MeshLambertMaterial({color:0xFF3333});
+      // body
+      const body=new THREE.Mesh(new THREE.SphereGeometry(0.42*sc,9,7), mChicken);
+      body.scale.set(1.05,0.9,1.25); body.position.set(x, 0.62*sc, z); scene.add(body);
+      // tail feathers
+      for(let t=0;t<3;t++){
+        const fa=(t-1)*0.25;
+        const feather=new THREE.Mesh(new THREE.ConeGeometry(0.1*sc,0.65*sc,4), mChicken);
+        feather.rotation.x=-0.8; feather.rotation.z=fa; feather.rotation.y=rot;
+        feather.position.set(x-cr*0.5*sc, 0.85*sc, z-sr*0.5*sc); scene.add(feather);
+      }
+      // wings
+      for(const side of[-1,1]){
+        const wing=new THREE.Mesh(new THREE.SphereGeometry(0.3*sc,7,5), mChicken);
+        wing.scale.set(0.5,0.8,1.1);
+        wing.position.set(x+pr*side*0.42*sc, 0.72*sc, z+pz2*side*0.42*sc); scene.add(wing);
+      }
+      // neck
+      const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.14*sc,0.18*sc,0.4*sc,6), mChicken);
+      neck.rotation.y=rot;
+      neck.position.set(x+cr*0.38*sc, 1.0*sc, z+sr*0.38*sc); scene.add(neck);
+      // head
+      const head=new THREE.Mesh(new THREE.SphereGeometry(0.26*sc,8,6), mChicken);
+      head.position.set(x+cr*0.56*sc, 1.3*sc, z+sr*0.56*sc); scene.add(head);
+      // beak
+      const beak=new THREE.Mesh(new THREE.ConeGeometry(0.08*sc,0.32*sc,4), new THREE.MeshLambertMaterial({color:0xFFAA00}));
+      beak.rotation.z=Math.PI/2; beak.rotation.y=rot;
+      beak.position.set(x+cr*0.84*sc, 1.28*sc, z+sr*0.84*sc); scene.add(beak);
+      // wattle
+      const wattle=new THREE.Mesh(new THREE.SphereGeometry(0.1*sc,6,5), mWattle);
+      wattle.scale.set(0.7,1.3,0.7);
+      wattle.position.set(x+cr*0.72*sc, 1.15*sc, z+sr*0.72*sc); scene.add(wattle);
+      // comb
+      for(let c=0;c<3;c++){
+        const comb=new THREE.Mesh(new THREE.SphereGeometry(0.09*sc,5,4), mRed);
+        comb.position.set(x+cr*0.56*sc+pr*(c-1)*0.09*sc, (1.52+c*0.04)*sc, z+sr*0.56*sc+pz2*(c-1)*0.09*sc);
+        scene.add(comb);
+      }
+      // eyes
+      const mEyeC=new THREE.MeshBasicMaterial({color:0x111100});
+      const mEyeYC=new THREE.MeshBasicMaterial({color:0xFFCC00});
+      for(const side of[-1,1]){
+        const eyeY=new THREE.Mesh(new THREE.SphereGeometry(0.075*sc,5,4), mEyeYC);
+        eyeY.position.set(x+cr*0.64*sc+pr*side*0.22*sc, 1.36*sc, z+sr*0.64*sc+pz2*side*0.22*sc);
+        scene.add(eyeY);
+        const eye=new THREE.Mesh(new THREE.SphereGeometry(0.045*sc,5,4), mEyeC);
+        eye.position.set(x+cr*0.67*sc+pr*side*0.22*sc, 1.36*sc, z+sr*0.67*sc+pz2*side*0.22*sc);
+        scene.add(eye);
+      }
+      // legs
+      for(const side of[-1,1]){
+        const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.07*sc,0.06*sc,0.55*sc,5), new THREE.MeshLambertMaterial({color:0xFFAA00}));
+        leg.position.set(x+pr*side*0.18*sc, 0.28*sc, z+pz2*side*0.18*sc); scene.add(leg);
+        // foot toes
+        for(let t=0;t<3;t++){
+          const toeA=(t-1)*0.55;
+          const toe=new THREE.Mesh(new THREE.CylinderGeometry(0.03*sc,0.02*sc,0.28*sc,4), new THREE.MeshLambertMaterial({color:0xFFAA00}));
+          toe.rotation.z=Math.PI/2; toe.rotation.y=rot+toeA;
+          toe.position.set(x+pr*side*0.18*sc+cr*Math.cos(toeA)*0.14*sc, 0.03*sc, z+pz2*side*0.18*sc+sr*Math.cos(toeA)*0.14*sc);
+          scene.add(toe);
+        }
+      }
+    });
+
+    // Flower patches — bigger petals
+    place(35, SAFE, (x,z)=>{
+      const mats=[mFlower1,mFlower2,mFlower3,mFlower4];
+      const flMat=mats[Math.floor(Math.random()*4)];
+      for(let f=0;f<6;f++){
+        const fx=x+(Math.random()-0.5)*4, fz=z+(Math.random()-0.5)*4;
+        const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.9,4), mBush);
+        stem.position.set(fx,0.45,fz); scene.add(stem);
+        const petals=new THREE.Mesh(new THREE.SphereGeometry(0.35,6,4), flMat);
+        petals.scale.y=0.4; petals.position.set(fx,0.95,fz); scene.add(petals);
+      }
+    });
+
+    // Bush clusters — bigger
+    place(25, SAFE, (x,z)=>{
+      for(let b=0;b<4;b++){
+        const bush=new THREE.Mesh(new THREE.SphereGeometry(1.0+Math.random()*0.6,8,5), mBush);
+        bush.position.set(x+(Math.random()-0.5)*3,0.9,z+(Math.random()-0.5)*3);
+        scene.add(bush);
+      }
+    });
+
+    // Rocks — bigger
+    place(15, SAFE, (x,z)=>{
+      const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(0.7,0), mRock);
+      rock.scale.setScalar(1.0+Math.random()*1.2);
+      rock.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+      rock.position.set(x,0.5,z); scene.add(rock);
+    });
+
+    // Wooden fence sections — bigger posts/rails
+    place(18, SAFE, (x,z)=>{
+      const rot=Math.random()*Math.PI;
+      for(let p=0;p<3;p++){
+        const post=new THREE.Mesh(new THREE.BoxGeometry(0.28,2.0,0.28), mFence);
+        post.position.set(x+Math.cos(rot)*p*2.5,1.0,z+Math.sin(rot)*p*2.5); scene.add(post);
+      }
+      for(const ry of[0.6,1.3]){
+        const rail=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.14,5.2), mFence);
+        rail.position.set(x+Math.cos(rot)*2.5,ry,z+Math.sin(rot)*2.5);
+        rail.rotation.y=rot; scene.add(rail);
+      }
+    });
+  }
+}
+
+// ── KART MESH ─────────────────────────────────────────────────────────────────
+function makeKart(col, acc){
+  const g = new THREE.Group();
+
+  const mBody  = new THREE.MeshLambertMaterial({color:col});
+  const mAcc   = new THREE.MeshLambertMaterial({color:acc});
+  const mBlack = new THREE.MeshLambertMaterial({color:0x111111});
+  const mDark  = new THREE.MeshLambertMaterial({color:0x222222});
+  const mGrey  = new THREE.MeshLambertMaterial({color:0x888888});
+  const mChrome= new THREE.MeshLambertMaterial({color:0xCCCCCC});
+  const mGoose = new THREE.MeshLambertMaterial({color:0xF5F0DC});
+  const mBeak  = new THREE.MeshLambertMaterial({color:0xFF9900});
+  const mEye   = new THREE.MeshBasicMaterial({color:0x111111});
+  const mEyeW  = new THREE.MeshBasicMaterial({color:0xFFFFFF});
+  const mRed   = new THREE.MeshBasicMaterial({color:0xFF2200});
+  const mYellow= new THREE.MeshBasicMaterial({color:0xFFDD00});
+  const mExhaust=new THREE.MeshLambertMaterial({color:0x886644});
+
+  function add(geo, mat, x=0, y=0, z=0, rx=0, ry=0, rz=0, sx=1, sy=1, sz=1){
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    m.scale.set(sx, sy, sz);
+    g.add(m); return m;
+  }
+
+  // ── CHASSIS ──────────────────────────────────────────────────────────────
+  // Main body — low flat slab
+  add(new THREE.BoxGeometry(3.0, 0.55, 4.2), mBody, 0, 0.55, 0);
+  // Nose cone — tapered front
+  add(new THREE.BoxGeometry(2.2, 0.45, 1.2), mAcc,  0, 0.50, 2.7);
+  // Rear box — slightly taller
+  add(new THREE.BoxGeometry(2.8, 0.65, 1.0), mBody, 0, 0.60, -2.0);
+  // Side skirts left & right
+  add(new THREE.BoxGeometry(0.25, 0.35, 3.6), mAcc,  -1.55, 0.38, -0.1);
+  add(new THREE.BoxGeometry(0.25, 0.35, 3.6), mAcc,   1.55, 0.38, -0.1);
+  // Underbody plate
+  add(new THREE.BoxGeometry(2.8, 0.12, 4.0), mDark, 0, 0.18, 0);
+  // Front splitter
+  add(new THREE.BoxGeometry(2.8, 0.1, 0.5), mBlack, 0, 0.3, 3.1);
+
+  // ── COCKPIT / SEAT ───────────────────────────────────────────────────────
+  // Seat bucket
+  add(new THREE.BoxGeometry(1.4, 0.7, 1.2), mDark, 0, 1.05, -0.3);
+  // Seat back
+  add(new THREE.BoxGeometry(1.4, 0.8, 0.18), mDark, 0, 1.55, -0.85);
+  // Dashboard
+  add(new THREE.BoxGeometry(1.8, 0.35, 0.18), mBlack, 0, 1.25, 1.1);
+  // Steering wheel
+  add(new THREE.TorusGeometry(0.35, 0.06, 6, 12), mChrome, 0, 1.55, 1.05, 0.4, 0, 0);
+  // Steering column
+  add(new THREE.CylinderGeometry(0.05, 0.05, 0.55, 6), mChrome, 0, 1.2, 1.05, 0.4, 0, 0);
+
+  // ── ROLL CAGE ────────────────────────────────────────────────────────────
+  // Two side hoops
+  for(const sx of [-1.1, 1.1]){
+    add(new THREE.CylinderGeometry(0.07, 0.07, 2.0, 6), mChrome, sx, 1.8, -0.1);
+    // Diagonal brace
+    add(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6), mChrome, sx, 1.5, 0.3, 0.55, 0, 0);
+  }
+  // Top crossbar
+  add(new THREE.CylinderGeometry(0.07, 0.07, 2.2, 6), mChrome, 0, 2.75, -0.1, 0, 0, Math.PI/2);
+
+  // ── REAR WING / SPOILER ──────────────────────────────────────────────────
+  // Wing endplates
+  for(const sx of [-1.3, 1.3]){
+    add(new THREE.BoxGeometry(0.1, 0.6, 0.9), mBody, sx, 1.35, -2.15);
+  }
+  // Wing main plane
+  add(new THREE.BoxGeometry(2.6, 0.12, 0.85), mAcc, 0, 1.65, -2.15);
+  // Wing support struts
+  for(const sx of [-0.8, 0.8]){
+    add(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 5), mChrome, sx, 1.05, -2.15, 0.15, 0, 0);
+  }
+
+  // ── EXHAUST PIPES ────────────────────────────────────────────────────────
+  for(const sx of [-0.7, 0.7]){
+    add(new THREE.CylinderGeometry(0.12, 0.1, 0.9, 8), mExhaust, sx, 0.52, -2.55, Math.PI/2, 0, 0);
+    // Exhaust tip (darker rim)
+    add(new THREE.CylinderGeometry(0.13, 0.13, 0.08, 8), mBlack, sx, 0.52, -3.02, Math.PI/2, 0, 0);
+  }
+
+  // ── WHEELS ───────────────────────────────────────────────────────────────
+  for(const [wx, wz] of [[-1.65,1.4],[1.65,1.4],[-1.65,-1.5],[1.65,-1.5]]){
+    // Tyre
+    add(new THREE.CylinderGeometry(0.62, 0.62, 0.55, 12), mBlack, wx, 0.48, wz, 0, 0, Math.PI/2);
+    // Rim
+    add(new THREE.CylinderGeometry(0.35, 0.35, 0.58, 8), mChrome, wx, 0.48, wz, 0, 0, Math.PI/2);
+    // Hubcap centre
+    add(new THREE.CylinderGeometry(0.12, 0.12, 0.6, 6), mAcc, wx, 0.48, wz, 0, 0, Math.PI/2);
+    // Tyre tread ring
+    add(new THREE.TorusGeometry(0.62, 0.06, 4, 12), mDark, wx, 0.48, wz, Math.PI/2, 0, 0);
+  }
+
+  // ── GOOSE DRIVER ─────────────────────────────────────────────────────────
+  // Body (plump oval)
+  const gooseBody = add(new THREE.SphereGeometry(0.72, 10, 8), mGoose, 0, 1.82, 0.1);
+  gooseBody.scale.set(1.0, 1.2, 1.1);
+  // Wing left
+  add(new THREE.SphereGeometry(0.4, 7, 5), mGoose, -0.72, 1.75, 0.0, 0, 0, 0.5, 1, 0.4, 0.7);
+  // Wing right
+  add(new THREE.SphereGeometry(0.4, 7, 5), mGoose,  0.72, 1.75, 0.0, 0, 0,-0.5, 1, 0.4, 0.7);
+  // Neck
+  add(new THREE.CylinderGeometry(0.18, 0.26, 0.7, 7), mGoose, 0, 2.45, 0.5, -0.3, 0, 0);
+  // Head
+  const gooseHead = add(new THREE.SphereGeometry(0.38, 9, 7), mGoose, 0, 2.88, 0.82);
+  gooseHead.scale.set(1, 1.05, 1.1);
+  // Beak upper
+  add(new THREE.BoxGeometry(0.22, 0.1, 0.55), mBeak, 0, 2.88, 1.28);
+  // Beak lower
+  add(new THREE.BoxGeometry(0.18, 0.08, 0.45), mBeak, 0, 2.78, 1.25);
+  // Eyes — white sclera + dark pupil
+  for(const sx of [-0.2, 0.2]){
+    add(new THREE.SphereGeometry(0.1, 6, 5), mEyeW, sx, 2.95, 1.12);
+    add(new THREE.SphereGeometry(0.055, 5, 4), mEye, sx*1.05, 2.96, 1.22);
+  }
+  // Racing helmet (little cap on head)
+  const helmetCol = new THREE.MeshLambertMaterial({color:acc});
+  add(new THREE.SphereGeometry(0.41, 8, 6), helmetCol, 0, 3.05, 0.72, 0,0,0, 1, 0.65, 1);
+  // Visor
+  add(new THREE.BoxGeometry(0.42, 0.1, 0.22), new THREE.MeshBasicMaterial({color:0x88CCFF,transparent:true,opacity:0.7}), 0, 2.95, 1.06);
+  // Tail feathers (back of body)
+  for(const[tx,tz,tr] of [[0,-0.7,-0.6],[0.25,-0.62,-0.5],[-0.25,-0.62,-0.5]]){
+    add(new THREE.ConeGeometry(0.12, 0.55, 5), mGoose, tx, 1.85+tz*0.1, tz, tr, 0, tx*0.3);
+  }
+
+  // ── RACING NUMBER PLATE ──────────────────────────────────────────────────
+  add(new THREE.BoxGeometry(0.9, 0.45, 0.08), new THREE.MeshBasicMaterial({color:0xFFFFFF}), 0, 0.75, 3.22);
+
+  // ── HEADLIGHTS ───────────────────────────────────────────────────────────
+  for(const lx of [-0.75, 0.75]){
+    add(new THREE.SphereGeometry(0.18, 7, 5), mYellow, lx, 0.7, 3.05);
+    // Lens rim
+    add(new THREE.TorusGeometry(0.18, 0.04, 5, 10), mChrome, lx, 0.7, 3.05, Math.PI/2, 0, 0);
+  }
+  // Rear lights
+  for(const lx of [-0.75, 0.75]){
+    add(new THREE.SphereGeometry(0.15, 7, 5), mRed, lx, 0.7, -2.65);
+  }
+
+  return g;
+}
+
+// ── SPAWN ─────────────────────────────────────────────────────────────────────
+function spawnKarts(){
+  const p0=trackPts[0],p1=trackPts[1];
+  const fdx=p1.x-p0.x,fdz=p1.z-p0.z,fl=Math.sqrt(fdx*fdx+fdz*fdz)||1;
+  const fwd={x:fdx/fl,z:fdz/fl},right={x:-fwd.z,z:fwd.x};
+  const startAngle=Math.atan2(-fwd.x,-fwd.z);
+  const slots=[{c:1,r:0},{c:-1,r:0},{c:1,r:1},{c:-1,r:1}];
+  function gpos(i){
+    const{c,r}=slots[i];
+    return new THREE.Vector3(p0.x+right.x*c*7-fwd.x*(r*10+6),0,p0.z+right.z*c*7-fwd.z*(r*10+6));
+  }
+  const ch=selChar;
+  player={mesh:makeKart(ch.color,ch.accent),pos:gpos(0),angle:startAngle,spd:0,
+    cp:0,lap:1,totalCPs:0,done:false,stunned:0,boost:0,abReady:true,abCd:0,char:ch};
+  player.mesh.position.copy(player.pos);player.mesh.rotation.y=startAngle;scene.add(player.mesh);
+  bots=[];
+  CHARS.filter(c=>c.id!==ch.id).slice(0,3).forEach((bc,i)=>{
+    const b={mesh:makeKart(bc.color,bc.accent),pos:gpos(i+1),angle:startAngle,spd:0,
+      cp:0,lap:1,totalCPs:0,done:false,stunned:0,boost:0,abReady:true,abCd:0,char:bc,aiTgt:5,aiWander:0};
+    b.mesh.position.copy(b.pos);b.mesh.rotation.y=startAngle;scene.add(b.mesh);bots.push(b);
+  });
+}
+
+// ── SCENE INIT ────────────────────────────────────────────────────────────────
+function initScene(){
+  const tk=selTrack;
+  scene=new THREE.Scene();scene.background=new THREE.Color(tk.sky);scene.fog=new THREE.FogExp2(tk.fog,tk.fogD);
+  camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,900);
+  renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;clock=new THREE.Clock();
+  scene.add(new THREE.AmbientLight(tk.ambient,1.3));
+  const sun=new THREE.DirectionalLight(tk.sun,1.8);sun.position.set(40,80,20);
+  sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+  const gnd=new THREE.Mesh(new THREE.PlaneGeometry(700,700),new THREE.MeshBasicMaterial({color:tk.ground}));
+  gnd.rotation.x=-Math.PI/2;scene.add(gnd);
+  trackPts=makeTrackPts();NCP=trackPts.length;
+  buildRoad(tk);buildDecos(tk);spawnKarts();
+  mmCtx=document.getElementById('minimap').getContext('2d');
+}
+
+// ── BARRIER COLLISION ─────────────────────────────────────────────────────────
+// ── BARRIER COLLISION ─────────────────────────────────────────────────────────
+// Collides kart against the exact barrier segment positions stored in barrierSegs.
+// For each segment we find the closest point on the line, then if the kart centre
+// is within KART_R of it we push the kart away and reflect its speed.
+const KART_R = 2.0;
+
+function barrierCollide(k){
+  for(let s=0;s<barrierSegs.length;s++){
+    const {ax,az,bx,bz}=barrierSegs[s];
+    const sdx=bx-ax, sdz=bz-az;
+    const sl2=sdx*sdx+sdz*sdz; if(sl2<0.0001) continue;
+    const t=Math.max(0,Math.min(1,((k.pos.x-ax)*sdx+(k.pos.z-az)*sdz)/sl2));
+    const cx=ax+t*sdx, cz=az+t*sdz;
+    const dx=k.pos.x-cx, dz=k.pos.z-cz;
+    const dist=Math.sqrt(dx*dx+dz*dz);
+    if(dist<KART_R && dist>0.001){
+      // Push kart away from barrier surface
+      const nx=dx/dist, nz=dz/dist;
+      k.pos.x=cx+nx*KART_R;
+      k.pos.z=cz+nz*KART_R;
+      // Cancel velocity into the wall, keep sliding component
+      const vx=-Math.sin(k.angle)*k.spd, vz=-Math.cos(k.angle)*k.spd;
+      const vn=vx*nx+vz*nz;
+      if(vn<0){ // moving toward wall
+        k.spd*=0.25;
+      }
+      break; // one collision per frame is enough
+    }
+  }
+}
+
+// ── PHYSICS ───────────────────────────────────────────────────────────────────
+function updatePlayer(dt){
+  const k=player;
+  const ms=k.boost>0?MAXSPD*k.char.spd*1.7:MAXSPD*k.char.spd;
+  if(k.stunned>0){k.stunned-=dt*1000;k.spd*=0.9;}
+  else{
+    if(k.boost>0)k.boost-=dt*1000;
+    if(keys['KeyW']||keys['ArrowUp'])k.spd=Math.min(k.spd+ACC,ms);
+    else if(keys['KeyS']||keys['ArrowDown'])k.spd=Math.max(k.spd-BRK,-ms*0.35);
+    else{k.spd*=(1-FRIC);if(Math.abs(k.spd)<0.001)k.spd=0;}
+    const tr=TURN*k.char.hdl*Math.min(Math.abs(k.spd)/MAXSPD+0.3,1);
+    if(keys['KeyA']||keys['ArrowLeft'])k.angle+=tr;
+    if(keys['KeyD']||keys['ArrowRight'])k.angle-=tr;
+  }
+  k.pos.x-=Math.sin(k.angle)*k.spd;k.pos.z-=Math.cos(k.angle)*k.spd;
+  barrierCollide(k);
+  k.mesh.position.set(k.pos.x,0,k.pos.z);k.mesh.rotation.y=k.angle;
+  tickCD(k,dt);checkCP(k,true);
+}
+
+function updateBot(b,dt){
+  const tgt=trackPts[b.aiTgt];
+  const dx=tgt.x-b.pos.x,dz=tgt.z-b.pos.z;
+  if(Math.sqrt(dx*dx+dz*dz)<7){b.aiTgt=(b.aiTgt+5)%NCP;if(Math.random()<0.3)b.aiWander=(Math.random()-0.5)*0.4;}
+  const ta=Math.atan2(-dx,-dz)+b.aiWander;
+  let da=ta-b.angle;while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;
+  b.angle+=Math.sign(da)*Math.min(Math.abs(da),TURN*b.char.hdl);
+  if(b.stunned>0){b.stunned-=dt*1000;b.spd*=0.88;}
+  else b.spd=Math.min(b.spd+ACC*0.75,MAXSPD*b.char.spd*0.88);
+  b.pos.x-=Math.sin(b.angle)*b.spd;b.pos.z-=Math.cos(b.angle)*b.spd;
+  barrierCollide(b);
+  b.mesh.position.set(b.pos.x,0,b.pos.z);b.mesh.rotation.y=b.angle;
+  tickCD(b,dt);botAI(b);checkCP(b,false);
+}
+
+function tickCD(k,dt){if(!k.abReady){k.abCd=Math.max(0,k.abCd-dt*1000);if(k.abCd<=0)k.abReady=true;}}
+
+function checkCP(k,isPlayer){
+  const next=(k.cp+1)%NCP;
+  if(Math.hypot(k.pos.x-trackPts[next].x,k.pos.z-trackPts[next].z)<8){
+    const prev=k.cp;k.cp=next;k.totalCPs++;
+    if(prev===NCP-1&&k.cp===0){
+      k.lap++;
+      if(isPlayer){if(k.lap>NLAPS){endRace();return;}floatMsg('🏁 LAP '+k.lap+'!','#FFD700');}
+    }
+  }
+}
+
+function getPos(){
+  let pos=1;for(const b of bots)if(b.totalCPs>player.totalCPs)pos++;return pos;
+}
+
+function resolveCollisions(){
+  const all=[player,...bots],R=2.6,D=R*2;
+  for(let i=0;i<all.length;i++)for(let j=i+1;j<all.length;j++){
+    const a=all[i],b=all[j],dx=b.pos.x-a.pos.x,dz=b.pos.z-a.pos.z;
+    const dist=Math.sqrt(dx*dx+dz*dz)||0.001;
+    if(dist<D){
+      const nx=dx/dist,nz=dz/dist,ov=(D-dist)/2;
+      a.pos.x-=nx*ov;a.pos.z-=nz*ov;b.pos.x+=nx*ov;b.pos.z+=nz*ov;
+      a.mesh.position.set(a.pos.x,0,a.pos.z);b.mesh.position.set(b.pos.x,0,b.pos.z);
+      const imp=(a.spd-b.spd)*0.4;a.spd-=imp;b.spd+=imp;
+    }
+  }
+}
+
+// ── PROJECTILES ───────────────────────────────────────────────────────────────
+function updateProjs(dt){
+  for(let i=projs.length-1;i>=0;i--){
+    const p=projs[i];p.life-=dt*1000;
+    p.pos.x+=p.dx*1.1;p.pos.z+=p.dz*1.1;
+    p.mesh.position.set(p.pos.x,0.8,p.pos.z);p.mesh.rotation.y+=0.25;
+    let hit=false;
+    for(const v of p.victims)if(Math.hypot(p.pos.x-v.pos.x,p.pos.z-v.pos.z)<3.5){v.stunned=2200;hit=true;break;}
+    if(hit||p.life<=0){scene.remove(p.mesh);projs.splice(i,1);}
+  }
+}
+
+// ── SHOCKWAVES ────────────────────────────────────────────────────────────────
+function spawnShockwave(pos,col,victims){
+  const mat=new THREE.MeshBasicMaterial({color:col,side:THREE.DoubleSide,transparent:true,opacity:0.9});
+  const mesh=new THREE.Mesh(new THREE.RingGeometry(0.5,1.8,32),mat);
+  mesh.rotation.x=-Math.PI/2;mesh.position.set(pos.x,0.4,pos.z);scene.add(mesh);
+  shockwaves.push({mesh,mat,radius:1.8,ox:pos.x,oz:pos.z,victims,hit:new Set()});
+}
+
+function updateShockwaves(dt){
+  for(let i=shockwaves.length-1;i>=0;i--){
+    const sw=shockwaves[i];sw.radius+=40*dt;
+    sw.mat.opacity=0.85*(1-sw.radius/28);
+    const s=sw.radius/1.8;sw.mesh.scale.set(s,s,s);
+    for(const v of sw.victims){
+      if(!sw.hit.has(v)&&Math.hypot(v.pos.x-sw.ox,v.pos.z-sw.oz)<=sw.radius){v.stunned=2000;sw.hit.add(v);}
+    }
+    if(sw.radius>=28){scene.remove(sw.mesh);sw.mat.dispose();shockwaves.splice(i,1);}
+  }
+}
+
+// ── ABILITIES ─────────────────────────────────────────────────────────────────
+function useAbility(k,victims){
+  if(!k.abReady)return;
+  k.abReady=false;k.abCd=k.char.cd;
+  const ip=k===player;
+  if(k.char.id==='honker'){
+    spawnShockwave(k.pos,0xFFDD00,victims);
+    if(ip){flash('#FFD700',0.45);floatMsg('💛 MEGA HONK!','#FFD700');}
+  } else if(k.char.id==='grey'){
+    k.boost=3000;if(ip){flash('#7DF9FF',0.3);floatMsg('❄️ ICE GLIDE!','#7DF9FF');}
+  } else if(k.char.id==='canada'){
+    const pm={mesh:new THREE.Mesh(new THREE.SphereGeometry(0.55,6,4),new THREE.MeshBasicMaterial({color:0xFFFFFF})),
+      pos:k.pos.clone(),dx:-Math.sin(k.angle),dz:-Math.cos(k.angle),life:3000,victims};
+    scene.add(pm.mesh);projs.push(pm);if(ip){flash('#FFFFFF',0.25);floatMsg('🪶 FEATHERS!','#fff');}
+  } else {
+    k.boost=4500;if(ip){flash('#FFD700',0.55);floatMsg('⭐ GOLDEN SPRINT!','#FFD700');}
+  }
+}
+
+function botAI(b){
+  if(!b.abReady||raceStartTimer<3)return;
+  const others=[player,...bots.filter(x=>x!==b)];
+  const near=others.some(k=>Math.hypot(b.pos.x-k.pos.x,b.pos.z-k.pos.z)<20);
+  const self=b.char.id==='grey'||b.char.id==='golden';
+  if(near||(self&&Math.random()<0.008))useAbility(b,others);
+}
+
+// ── CAMERA ────────────────────────────────────────────────────────────────────
+function updateCam(){
+  camera.position.set(player.pos.x+Math.sin(player.angle)*22,28,player.pos.z+Math.cos(player.angle)*22);
+  camera.lookAt(player.pos.x-Math.sin(player.angle)*8,0,player.pos.z-Math.cos(player.angle)*8);
+}
+
+// ── HUD ───────────────────────────────────────────────────────────────────────
+function updateHUD(dt){
+  raceTime+=dt;
+  document.getElementById('lapd').textContent='LAP '+Math.min(player.lap,NLAPS)+'/'+NLAPS;
+  document.getElementById('posd').textContent='POS '+getPos()+'/4';
+  document.getElementById('spdd').textContent=Math.round(Math.abs(player.spd)*200)+' km/h';
+  document.getElementById('abfill').style.width=(player.abReady?100:Math.round((1-player.abCd/selChar.cd)*100))+'%';
+}
+
+function drawMinimap(){
+  const c=mmCtx,W=110,sc=0.48;
+  c.clearRect(0,0,W,W);c.fillStyle='rgba(0,0,0,.75)';c.fillRect(0,0,W,W);
+  c.strokeStyle='#666';c.lineWidth=5;c.beginPath();
+  trackPts.forEach((p,i)=>{const x=W/2+p.x*sc,y=W/2+p.z*sc;i===0?c.moveTo(x,y):c.lineTo(x,y);});
+  c.closePath();c.stroke();
+  c.fillStyle='#FF4444';
+  for(const b of bots){c.beginPath();c.arc(W/2+b.pos.x*sc,W/2+b.pos.z*sc,3,0,Math.PI*2);c.fill();}
+  c.fillStyle='#FFD700';c.beginPath();c.arc(W/2+player.pos.x*sc,W/2+player.pos.z*sc,5,0,Math.PI*2);c.fill();
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function flash(col,op){
+  const el=document.getElementById('flash');el.style.background=col;el.style.opacity=op;
+  setTimeout(()=>el.style.opacity=0,280);
+}
+function floatMsg(txt,col){
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;top:35%;left:50%;transform:translate(-50%,-50%);font-size:44px;font-weight:900;color:'+col+';text-shadow:3px 3px 0 #000;pointer-events:none;z-index:80;animation:ft 1s ease forwards;';
+  d.textContent=txt;
+  if(!document.getElementById('ftStyle')){
+    const s=document.createElement('style');s.id='ftStyle';
+    s.textContent='@keyframes ft{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}100%{opacity:0;transform:translate(-50%,-90%) scale(1.1)}}';
+    document.head.appendChild(s);
+  }
+  document.body.appendChild(d);setTimeout(()=>d.remove(),1000);
+}
+
+// ── FINISH ────────────────────────────────────────────────────────────────────
+function endRace(){
+  if(finished)return;finished=true;player.done=true;
+  const pos=getPos(),m=Math.floor(raceTime/60),s=(raceTime%60).toFixed(2);
+  document.getElementById('fintitle').textContent=pos===1?'🏆 WINNER! HONK HONK!':'🏁 RACE OVER!';
+  document.getElementById('finpos').textContent=['🥇 1ST PLACE!','🥈 2ND PLACE','🥉 3RD PLACE','4TH PLACE'][pos-1]||pos+'TH';
+  document.getElementById('fintm').textContent='Time: '+m+':'+s.padStart(5,'0');
+  document.getElementById('fin').style.display='flex';
+}
+
+// ── COUNTDOWN ─────────────────────────────────────────────────────────────────
+function startCD(){
+  cdActive=true;const el=document.getElementById('cdtxt');el.style.display='flex';
+  const seq=['3','2','1','GO! 🪿'];let i=0;
+  function tick(){
+    el.textContent=seq[i++];
+    if(i<seq.length)setTimeout(tick,900);
+    else setTimeout(()=>{el.style.display='none';cdActive=false;racing=true;},700);
+  }
+  tick();
+}
+
+// ── LOOP ──────────────────────────────────────────────────────────────────────
+function loop(){
+  requestAnimationFrame(loop);
+  if(!player)return;
+  const dt=Math.min(clock.getDelta(),0.05);
+  if(racing&&!finished&&!cdActive){
+    raceStartTimer+=dt;
+    updatePlayer(dt);
+    bots.forEach(b=>updateBot(b,dt));
+    if(raceStartTimer>1.5)resolveCollisions();
+    updateProjs(dt);
+    updateShockwaves(dt);
+    updateHUD(dt);
+  }
+  updateCam();
+  drawMinimap();
+  renderer.render(scene,camera);
+  document.getElementById('dbg').textContent=
+    'racing='+racing+' cd='+cdActive+' spd='+player.spd.toFixed(3)+' W='+!!keys['KeyW']+' up='+!!keys['ArrowUp'];
+}
+
+// ── MENU ──────────────────────────────────────────────────────────────────────
+(function(){
+  let scid=CHARS[0].id,stid=TRACKS[0].id;
+  const cg=document.getElementById('cgrid');
+  CHARS.forEach(ch=>{
+    const d=document.createElement('div');d.className='ccard'+(ch.id===scid?' sel':'');
+    d.innerHTML='<div class="cemoji">'+ch.emoji+'</div><div class="cname">'+ch.name+'</div><div class="cabl">'+ch.ability+'</div><div class="cabl" style="color:#888;font-size:10px">'+ch.desc+'</div>';
+    d.onclick=()=>{document.querySelectorAll('.ccard').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');scid=ch.id;};
+    cg.appendChild(d);
+  });
+  const tg=document.getElementById('tgrid');
+  TRACKS.forEach(tk=>{
+    const d=document.createElement('div');d.className='tcard'+(tk.id===stid?' sel':'');
+    d.innerHTML='<div class="temoji">'+tk.emoji+'</div><div class="tname">'+tk.name+'</div>';
+    d.onclick=()=>{document.querySelectorAll('.tcard').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');stid=tk.id;};
+    tg.appendChild(d);
+  });
+  document.getElementById('sbtn').onclick=()=>{
+    selChar=CHARS.find(c=>c.id===scid);selTrack=TRACKS.find(t=>t.id===stid);
+    document.getElementById('menu').style.display='none';
+    document.getElementById('hud').style.display='flex';
+    document.getElementById('trkind').style.display='block';
+    document.getElementById('trkind').textContent=selTrack.emoji+' '+selTrack.name.toUpperCase();
+    document.getElementById('abbar').style.display='flex';
+    document.getElementById('abicon').textContent=selChar.emoji;
+    document.getElementById('ablbl').innerHTML=selChar.ability+'<br><span style="color:#aaa;font-size:11px">SPACE</span>';
+    document.getElementById('minimap').style.display='block';
+    initScene();loop();startCD();
+    window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+  };
+})();
+
+window.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Space'){e.preventDefault();if(racing&&!finished&&!cdActive)useAbility(player,bots);}
+});
+window.addEventListener('keyup',e=>{keys[e.code]=false;});
+</script>
+</body>
+</html>

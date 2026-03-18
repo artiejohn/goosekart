@@ -71,7 +71,7 @@ canvas#c{display:block;width:100vw;height:100vh;}
 <div id="dbg"></div>
 <div id="menu">
   <div id="menuPanel">
-  <h1>🪿 HONK KART</h1>
+  <h1>🪿 GOOSE KART</h1>
   <div style="color:#aaffaa;font-size:18px;letter-spacing:3px;">GOOSE GRAND PRIX</div>
   <div class="mlbl">Choose Your Goose</div>
   <div class="cgrid" id="cgrid"></div>
@@ -210,14 +210,15 @@ function buildRoad(tk){
   scene.add(new THREE.Mesh(dg,new THREE.MeshBasicMaterial({color:0xFFFFBB})));
 
   // Start/finish line — bold chequered pattern centred on track
-  const s0=pts[0],s1=pts[1];
-  const fdx=s1.x-s0.x,fdz=s1.z-s0.z,fl=Math.sqrt(fdx*fdx+fdz*fdz)||1;
-  const fw={x:fdx/fl,z:fdz/fl},rt={x:-fw.z,z:fw.x};
+  const s0=pts[0];
+  const rt=rn(0); // use exact same normal as road ribbon
+  // forward = rotate normal 90°
+  const fw={x:rt.z,z:-rt.x};
   const ang=Math.atan2(fw.x,fw.z);
   const sqW=(W*2)/8;
   for(let ci=0;ci<8;ci++){
     const off=(ci-3.5)*sqW+sqW/2;  // offset from track centre along right-normal
-    const cx=s0.x+rt.x*off, cz=s0.z+rt.z*off;
+    const cx=s0.x+rt.x*(off-2), cz=s0.z+rt.z*(off-2);
     const sq=new THREE.Mesh(new THREE.BoxGeometry(sqW*0.98,0.12,3.5),
       new THREE.MeshBasicMaterial({color:ci%2===0?0xFFFFFF:0x111111}));
     sq.position.set(cx,0.1,cz);sq.rotation.y=ang;scene.add(sq);

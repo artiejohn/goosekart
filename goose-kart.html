@@ -30,10 +30,10 @@ canvas#c{display:block;width:100vw;height:100vh;}
 #menu h1{font-size:52px;color:#FFD700;text-shadow:3px 3px 0 #000;margin-top:80px;}
 #menuPanel{display:flex;flex-direction:column;align-items:center;gap:14px;max-height:90vh;overflow-y:auto;}
 .mlbl{color:#aaa;font-size:13px;letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
-.cgrid,.tgrid{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
-.ccard,.tcard{background:#1a1a1a;border:2px solid #444;border-radius:12px;
+.cgrid,.tgrid,.dgrid{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.ccard,.tcard,.dcard{background:#1a1a1a;border:2px solid #444;border-radius:12px;
   padding:12px 16px;cursor:pointer;text-align:center;color:#fff;transition:all .15s;}
-.ccard:hover,.tcard:hover,.ccard.sel,.tcard.sel{border-color:#FFD700;background:#221f00;}
+.ccard:hover,.tcard:hover,.dcard:hover,.ccard.sel,.tcard.sel,.dcard.sel{border-color:#FFD700;background:#221f00;}
 .cemoji,.temoji{font-size:30px;}.cname,.tname{font-size:12px;font-weight:700;margin-top:4px;}
 .cabl{font-size:11px;color:#FFD700;margin-top:2px;}
 #sbtn{margin-top:8px;padding:14px 48px;font-size:20px;font-weight:900;
@@ -77,6 +77,8 @@ canvas#c{display:block;width:100vw;height:100vh;}
   <div class="cgrid" id="cgrid"></div>
   <div class="mlbl">Select Track</div>
   <div class="tgrid" id="tgrid"></div>
+  <div class="mlbl">Difficulty</div>
+  <div class="dgrid" id="dgrid"></div>
   <button id="sbtn">🪿 HONK TO START!</button>
   <div style="color:#666;font-size:12px;">WASD / Arrow keys · SPACE for ability</div>
   </div>
@@ -94,12 +96,12 @@ canvas#c{display:block;width:100vw;height:100vh;}
 const CHARS=[
   {id:'honker',name:'Sir Honks-a-Lot',emoji:'🪿',color:0xF5F0DC,accent:0xFFA500,
    ability:'MEGA HONK',desc:'Shockwave stuns nearby racers',spd:1.0,hdl:1.0,cd:8000},
-  {id:'grey',  name:'Grey Feather',   emoji:'🦢',color:0xBBBBBB,accent:0x7DF9FF,
-   ability:'ICE GLIDE',  desc:'Burst of speed',              spd:1.0,hdl:1.0,cd:12000},
   {id:'canada',name:'Goose Trudeau',  emoji:'🦆',color:0x2a2a2a,accent:0xFFFFFF,
    ability:'FEATHER BLAST',desc:'Shoot feathers forward',    spd:1.0,hdl:1.0,cd:5000},
   {id:'golden',name:'Golden Goose',   emoji:'⭐',color:0xFFCC00,accent:0xFF8800,
-   ability:'???',desc:'Coming soon...',                      spd:1.0,hdl:1.0,cd:10000},
+   ability:'EGG DROP',desc:'Drop eggs that stun drivers',      spd:1.0,hdl:1.0,cd:10000},
+  {id:'racer', name:'Zoom McHonk',    emoji:'🏎️',color:0xFF3333,accent:0xFFFFFF,
+   ability:'NONE',desc:'No ability — pure speed and skill',  spd:1.08,hdl:1.15,cd:99999},
 ];
 const TRACKS=[
   {id:'snow',  name:'Frosty Peaks',emoji:'❄️',
@@ -109,6 +111,14 @@ const TRACKS=[
   {id:'grass', name:'Meadow Mile', emoji:'🌿',
    sky:0x5BB8FF,ground:0x2db832,asphalt:0x2a2a2a,fog:0x99DDFF,fogD:0.008,ambient:0x88BBFF,sun:0xFFFFCC},
 ];
+const DIFFICULTIES=[
+  {id:'easy',     label:'Easy',      emoji:'🐣', color:'#88FF88',
+   spdMult:0.82, launchSpd:0.25, lookahead:18, cornerLoad:0.15, turnMult:1.0, accel:0.9, cdMult:1.0},
+  {id:'normal',   label:'Normal',    emoji:'🪿', color:'#FFD700',
+   spdMult:1.18, launchSpd:0.55, lookahead:26, cornerLoad:0.35, turnMult:1.4, accel:1.3, cdMult:1.0},
+  {id:'hard',     label:'Hard',      emoji:'🔥', color:'#FF8800',
+   spdMult:1.18, launchSpd:0.55, lookahead:40, cornerLoad:0.15, turnMult:2.0, accel:1.8, cdMult:0.4},
+];
 const CTRL=[
   [80,0],[92,26],[96,54],[84,76],[58,92],[26,98],[0,93],[-26,98],[-58,92],[-84,74],
   [-96,44],[-96,8],[-88,-24],[-74,-54],[-54,-80],[-22,-95],[14,-92],[44,-80],[66,-55],[76,-28],
@@ -117,11 +127,12 @@ const CTRL=[
 // ── GAME STATE ────────────────────────────────────────────────────────────────
 let scene,camera,renderer,clock;
 let trackPts=[],NCP=0;
-let player=null,bots=[],projs=[],shockwaves=[];
+let player=null,bots=[],projs=[],shockwaves=[],eggs=[];
 let barrierSegs=[]; // [{ax,az,bx,bz}] — exact positions of every barrier panel edge
+let finishLine=null; // {ox,oz,nx,nz} — origin and forward-normal of start/finish line
 let keys={},racing=false,finished=false,cdActive=false;
 let raceTime=0,raceStartTimer=0;
-let selChar=null,selTrack=null,mmCtx=null;
+let selChar=null,selTrack=null,selDiff=null,mmCtx=null;
 const NLAPS=3, ROAD_W=13;
 const MAXSPD=0.65,ACC=0.022,BRK=0.038,FRIC=0.014,TURN=0.038;
 
@@ -253,6 +264,16 @@ function buildRoad(tk){
     fs.rotation.y=ang;scene.add(fs);
   }
 
+  // Store finish line as two endpoints for segment-intersection lap detection
+  // Matches exactly the chequered squares: centred on s0, spanning the full road width along rt
+  {
+    const rt0=rn(0);
+    finishLine={
+      ax: s0.x - rt0.x*W, az: s0.z - rt0.z*W,
+      bx: s0.x + rt0.x*W, bz: s0.z + rt0.z*W,
+      fx: rt0.z, fz: -rt0.x  // forward direction (crossing normal)
+    };
+  }
 
   // ── ARMCO BARRIERS + FENCE ───────────────────────────────────────────────
   // Placed at W+3 (outer kerb edge) outward — exactly where the kerb stripe ends.
@@ -1278,15 +1299,14 @@ function spawnKarts(){
   }
   const ch=selChar;
   player={mesh:makeKart(ch.color,ch.accent),pos:gpos(0),angle:startAngle,spd:0,
-    cp:0,lap:1,totalCPs:0,done:false,stunned:0,boost:0,abReady:true,abCd:0,char:ch};
+    cp:0,lap:1,totalCPs:0,done:false,stunned:0,boost:0,abReady:true,abCd:0,char:ch,prevFinishSide:null,prevPos:null};
   player.mesh.position.copy(player.pos);player.mesh.rotation.y=startAngle;scene.add(player.mesh);
   bots=[];
   CHARS.filter(c=>c.id!==ch.id).slice(0,3).forEach((bc,i)=>{
+    const isRacer=bc.id==='racer';
     const b={mesh:makeKart(bc.color,bc.accent),pos:gpos(i+1),angle:startAngle,spd:0,
       cp:0,lap:1,totalCPs:0,done:false,stunned:0,boost:0,abReady:true,abCd:0,char:bc,aiTgt:5,
-      lookahead:20+i*4, // staggered lookahead so bots don't all follow identical lines
-      laneOffset:[-4,0,4][i]??0, // lateral offset from track centre in world units
-    };
+      lookahead:isRacer?42:[30,22,26][i]??24, laneOffset:isRacer?0:[-3,3,0][i]??0, prevFinishSide:null,prevPos:null};
     b.mesh.position.copy(b.pos);b.mesh.rotation.y=startAngle;scene.add(b.mesh);bots.push(b);
   });
 }
@@ -1344,7 +1364,7 @@ function barrierCollide(k){
 // ── PHYSICS ───────────────────────────────────────────────────────────────────
 function updatePlayer(dt){
   const k=player;
-  const ms=k.boost>0?MAXSPD*k.char.spd*1.7:MAXSPD*k.char.spd;
+  const ms=k.boost>0?MAXSPD*k.char.spd*(k.boostMult||1.7):MAXSPD*k.char.spd;
   if(k.stunned>0){k.stunned-=dt*1000;k.spd*=0.9;}
   else{
     if(k.boost>0)k.boost-=dt*1000;
@@ -1362,24 +1382,36 @@ function updatePlayer(dt){
 }
 
 function updateBot(b,dt){
-  const ms=b.boost>0?MAXSPD*b.char.spd*1.7:MAXSPD*b.char.spd;
+  const BOT_SPD=selDiff.spdMult;
+  const ms=b.boost>0?MAXSPD*b.char.spd*BOT_SPD*(b.boostMult||1.7):MAXSPD*b.char.spd*BOT_SPD;
 
   // ── LOOKAHEAD TARGET ───────────────────────────────────────────────────────
-  const tgtIdx=(b.aiTgt+b.lookahead)%NCP;
+  // Use two targets: a close one for steering and a far one to detect upcoming corners
+  const tgtIdx=(b.aiTgt+selDiff.lookahead)%NCP;
+  const farIdx=(b.aiTgt+selDiff.lookahead+25)%NCP;
   const tgt=trackPts[tgtIdx];
+  const farTgt=trackPts[farIdx];
+
   // Compute track right-normal at target to apply lane offset
   const nextTgt=trackPts[(tgtIdx+1)%NCP];
   const tdx=nextTgt.x-tgt.x, tdz=nextTgt.z-tgt.z, tl=Math.sqrt(tdx*tdx+tdz*tdz)||1;
-  const trtx=-tdz/tl, trtz=tdx/tl; // right normal
+  const trtx=-tdz/tl, trtz=tdx/tl;
   const dx=(tgt.x+trtx*b.laneOffset)-b.pos.x, dz=(tgt.z+trtz*b.laneOffset)-b.pos.z;
 
   // Advance base waypoint when close enough
-  if(Math.sqrt(dx*dx+dz*dz)<9){
-    b.aiTgt=(b.aiTgt+5)%NCP;
+  if(Math.sqrt(dx*dx+dz*dz)<7){
+    b.aiTgt=(b.aiTgt+3)%NCP;
   }
 
+  // ── CORNER LOOKAHEAD ───────────────────────────────────────────────────────
+  // Measure how much the track curves ahead by comparing near and far target angles
+  const nearAng=Math.atan2(tgt.x-b.pos.x, tgt.z-b.pos.z);
+  const farAng=Math.atan2(farTgt.x-b.pos.x, farTgt.z-b.pos.z);
+  let curvature=Math.abs(farAng-nearAng);
+  while(curvature>Math.PI)curvature=Math.abs(curvature-Math.PI*2);
+
   // ── KART REPULSION ─────────────────────────────────────────────────────────
-  const KART_SENSE=7;
+  const KART_SENSE=8;
   let kartPushX=0, kartPushZ=0;
   const others=[player,...bots.filter(x=>x!==b)];
   for(const o of others){
@@ -1393,8 +1425,7 @@ function updateBot(b,dt){
   }
 
   // ── WALL AVOIDANCE ─────────────────────────────────────────────────────────
-  // Accumulate a repulsion vector from any nearby barrier segments
-  const WALL_SENSE=6.5; // how close before repulsion kicks in
+  const WALL_SENSE=9;
   let wallPushX=0, wallPushZ=0;
   for(let s=0;s<barrierSegs.length;s++){
     const {ax,az,bx,bz}=barrierSegs[s];
@@ -1405,24 +1436,22 @@ function updateBot(b,dt){
     const wx=b.pos.x-cx, wz=b.pos.z-cz;
     const dist=Math.sqrt(wx*wx+wz*wz);
     if(dist<WALL_SENSE && dist>0.001){
-      const strength=(WALL_SENSE-dist)/WALL_SENSE;
-      wallPushX+=wx/dist*strength;
-      wallPushZ+=wz/dist*strength;
+      const strength=((WALL_SENSE-dist)/WALL_SENSE)**2;
+      wallPushX+=wx/dist*strength*1.8;
+      wallPushZ+=wz/dist*strength*1.8;
     }
   }
 
   // ── STEERING ───────────────────────────────────────────────────────────────
   let ta=Math.atan2(-dx,-dz);
-  // Blend wall repulsion into target angle
   if(wallPushX!==0||wallPushZ!==0){
     const wallAng=Math.atan2(-wallPushX,-wallPushZ);
     let wda=wallAng-ta;
     while(wda>Math.PI)wda-=Math.PI*2;
     while(wda<-Math.PI)wda+=Math.PI*2;
     const wallStrength=Math.min(Math.sqrt(wallPushX*wallPushX+wallPushZ*wallPushZ),1);
-    ta+=wda*wallStrength*0.7;
+    ta+=wda*wallStrength*0.9;
   }
-  // Blend kart repulsion into target angle
   if(kartPushX!==0||kartPushZ!==0){
     const kartAng=Math.atan2(-kartPushX,-kartPushZ);
     let kda=kartAng-ta;
@@ -1431,19 +1460,47 @@ function updateBot(b,dt){
     const kartStrength=Math.min(Math.sqrt(kartPushX*kartPushX+kartPushZ*kartPushZ),1);
     ta+=kda*kartStrength*0.5;
   }
+
+  // ── EGG AVOIDANCE ──────────────────────────────────────────────────────────
+  const EGG_SENSE=9;
+  let eggPushX=0, eggPushZ=0;
+  for(const e of eggs){
+    if(e.triggered) continue;
+    const ex=b.pos.x-e.pos.x, ez=b.pos.z-e.pos.z;
+    const edist=Math.sqrt(ex*ex+ez*ez);
+    if(edist<EGG_SENSE && edist>0.001){
+      if(Math.random()<0.015) continue;
+      const strength=(EGG_SENSE-edist)/EGG_SENSE;
+      eggPushX+=ex/edist*strength;
+      eggPushZ+=ez/edist*strength;
+    }
+  }
+  if(eggPushX!==0||eggPushZ!==0){
+    const eggAng=Math.atan2(-eggPushX,-eggPushZ);
+    let eda=eggAng-ta;
+    while(eda>Math.PI)eda-=Math.PI*2;
+    while(eda<-Math.PI)eda+=Math.PI*2;
+    const eggStrength=Math.min(Math.sqrt(eggPushX*eggPushX+eggPushZ*eggPushZ),1)*0.55;
+    ta+=eda*eggStrength;
+  }
+
   let da=ta-b.angle;
   while(da>Math.PI)da-=Math.PI*2;
   while(da<-Math.PI)da+=Math.PI*2;
-  b.angle+=Math.sign(da)*Math.min(Math.abs(da),TURN);
+  // Bots turn faster than player so they can handle corners properly
+  b.angle+=Math.sign(da)*Math.min(Math.abs(da),TURN*selDiff.turnMult*b.char.hdl);
 
   // ── SPEED ──────────────────────────────────────────────────────────────────
   if(b.stunned>0){
     b.stunned-=dt*1000; b.spd*=0.88;
   } else {
-    // Slow slightly through sharp corners
-    const cornerSlow=1-Math.min(Math.abs(da)*0.5,0.35);
+    // Brake for sharp corners using lookahead curvature + immediate steering angle
+    const steerAngle=Math.abs(da);
+    const cornerLoad=Math.max(steerAngle*selDiff.cornerLoad, curvature*selDiff.cornerLoad*0.8);
+    const cornerSlow=1-Math.min(cornerLoad, 0.3);
     const topSpd=ms*cornerSlow;
-    b.spd=Math.min(b.spd+ACC, topSpd);
+    if(b.spd>topSpd) b.spd=Math.max(b.spd-BRK*1.2, topSpd);
+    else b.spd=Math.min(b.spd+ACC*selDiff.accel, topSpd);
     if(b.boost>0) b.boost-=dt*1000;
   }
 
@@ -1452,20 +1509,52 @@ function updateBot(b,dt){
   barrierCollide(b);
   b.mesh.position.set(b.pos.x,0,b.pos.z);
   b.mesh.rotation.y=b.angle;
-  tickCD(b,dt); botAI(b); checkCP(b,false);
+  tickCDBot(b,dt); botAI(b); checkCP(b,false);
 }
 
 function tickCD(k,dt){if(!k.abReady){k.abCd=Math.max(0,k.abCd-dt*1000);if(k.abCd<=0)k.abReady=true;}}
+function tickCDBot(b,dt){if(!b.abReady){b.abCd=Math.max(0,b.abCd-dt*1000*(1/(selDiff.cdMult||1)));if(b.abCd<=0)b.abReady=true;}}
+
+function segmentsIntersect(ax,az,bx,bz,cx,cz,dx,dz){
+  // Returns true if segment AB crosses segment CD
+  const d1x=bx-ax,d1z=bz-az,d2x=dx-cx,d2z=dz-cz;
+  const cross=d1x*d2z-d1z*d2x;
+  if(Math.abs(cross)<1e-10)return false;
+  const t=((cx-ax)*d2z-(cz-az)*d2x)/cross;
+  const u=((cx-ax)*d1z-(cz-az)*d1x)/cross;
+  return t>=0&&t<=1&&u>=0&&u<=1;
+}
 
 function checkCP(k,isPlayer){
+  // Advance intermediate checkpoints by proximity (skip index 0 — that's the finish line)
   const next=(k.cp+1)%NCP;
-  if(Math.hypot(k.pos.x-trackPts[next].x,k.pos.z-trackPts[next].z)<8){
-    const prev=k.cp;k.cp=next;k.totalCPs++;
-    if(prev===NCP-1&&k.cp===0){
-      k.lap++;
-      if(isPlayer){if(k.lap>NLAPS){endRace();return;}floatMsg('🏁 LAP '+k.lap+'!','#FFD700');}
+  if(next!==0&&Math.hypot(k.pos.x-trackPts[next].x,k.pos.z-trackPts[next].z)<18){
+    k.cp=next;k.totalCPs++;
+  }
+
+  // Lap counting: segment intersection with the visible finish line
+  // Only arm it when past 70% of checkpoints so we don't trigger on the opening straight
+  if(finishLine&&k.prevPos&&k.cp>NCP*0.7){
+    const crossed=segmentsIntersect(
+      k.prevPos.x,k.prevPos.z, k.pos.x,k.pos.z,
+      finishLine.ax,finishLine.az, finishLine.bx,finishLine.bz
+    );
+    if(crossed){
+      // Make sure we're crossing in the forward direction
+      const dvx=k.pos.x-k.prevPos.x,dvz=k.pos.z-k.prevPos.z;
+      const fwd=dvx*finishLine.fx+dvz*finishLine.fz;
+      if(fwd>0){
+        k.cp=0;k.totalCPs++;k.lap++;
+        if(isPlayer){
+          if(k.lap>NLAPS){endRace();return;}
+          floatMsg('🏁 LAP '+k.lap+'!','#FFD700');
+        }
+      }
     }
   }
+
+  // Store position for next frame's intersection test
+  k.prevPos={x:k.pos.x,z:k.pos.z};
 }
 
 function getPos(){
@@ -1537,7 +1626,100 @@ function updateShockwaves(dt){
   }
 }
 
-// ── ABILITIES ─────────────────────────────────────────────────────────────────
+// ── EGGS ──────────────────────────────────────────────────────────────────────
+function spawnEggs(k,victims){
+  // Drop 1 large egg directly behind the kart
+  const behindX=k.pos.x+Math.sin(k.angle)*6;
+  const behindZ=k.pos.z+Math.cos(k.angle)*6;
+
+  // Egg mesh — squashed sphere, shiny gold
+  const mat=new THREE.MeshPhongMaterial({
+    color:0xD4920A, emissive:0x7A4400, emissiveIntensity:0.35,
+    specular:0xFFFFFF, shininess:400
+  });
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(1.0,16,12),mat);
+  mesh.scale.set(0.85,1.2,0.85);
+  // Bright shimmer spot
+  const shimmerMat=new THREE.MeshBasicMaterial({color:0xFFFFDD,transparent:true,opacity:0.6});
+  const shimmer=new THREE.Mesh(new THREE.SphereGeometry(0.28,8,6),shimmerMat);
+  shimmer.position.set(0.3,0.6,0.5);
+  mesh.add(shimmer);
+  mesh.position.set(behindX,0.5,behindZ);
+  mesh.rotation.y=Math.random()*Math.PI*2;
+  scene.add(mesh);
+  eggs.push({mesh,pos:new THREE.Vector3(behindX,0,behindZ),victims,triggered:false});
+}
+
+function spawnEggSplatter(pos){
+  // Splat decal — flat ellipse on the ground
+  const splatMat=new THREE.MeshBasicMaterial({color:0xD4920A,transparent:true,opacity:0.85});
+  const splat=new THREE.Mesh(new THREE.CircleGeometry(2.2,16),splatMat);
+  splat.rotation.x=-Math.PI/2;
+  splat.position.set(pos.x,0.05,pos.z);
+  scene.add(splat);
+
+  // Yolk blob — bright orange circle in centre
+  const yolkMat=new THREE.MeshBasicMaterial({color:0xFF8800,transparent:true,opacity:0.9});
+  const yolk=new THREE.Mesh(new THREE.CircleGeometry(0.9,12),yolkMat);
+  yolk.rotation.x=-Math.PI/2;
+  yolk.position.set(pos.x,0.06,pos.z);
+  scene.add(yolk);
+
+  // Shell shards — small flat triangles flung outward
+  const shardMat=new THREE.MeshBasicMaterial({color:0xD4920A,side:THREE.DoubleSide});
+  const shards=[];
+  for(let s=0;s<8;s++){
+    const ang=s/8*Math.PI*2+Math.random()*0.4;
+    const dist=1.5+Math.random()*2.5;
+    const shard=new THREE.Mesh(new THREE.ConeGeometry(0.25+Math.random()*0.2,0.5+Math.random()*0.4,3),shardMat);
+    shard.rotation.x=-Math.PI/2;
+    shard.rotation.z=ang;
+    shard.position.set(pos.x+Math.cos(ang)*dist,0.08,pos.z+Math.sin(ang)*dist);
+    scene.add(shard);
+    shards.push(shard);
+  }
+
+  // Fade everything out after 2 seconds
+  let age=0;
+  const fadeInt=setInterval(()=>{
+    age+=0.05;
+    const op=Math.max(0,1-age/2);
+    splatMat.opacity=0.85*op;
+    yolkMat.opacity=0.9*op;
+    shardMat.opacity=op;
+    if(age>=2){
+      clearInterval(fadeInt);
+      scene.remove(splat);scene.remove(yolk);
+      shards.forEach(s=>scene.remove(s));
+    }
+  },50);
+}
+
+function updateEggs(dt){
+  for(let i=eggs.length-1;i>=0;i--){
+    const e=eggs[i];
+    // Gentle bob
+    e.mesh.position.y=0.4+Math.sin(Date.now()*0.004+i)*0.1;
+    e.mesh.rotation.y+=0.02;
+    if(!e.triggered){
+      for(const v of e.victims){
+        if(Math.hypot(e.pos.x-v.pos.x,e.pos.z-v.pos.z)<3.0){
+          v.stunned=1000;
+          e.triggered=true;
+          // Crack: quickly scale up then vanish
+          const pos=e.pos.clone();
+          e.mesh.scale.set(1.4,0.2,1.4); // squash flat like it cracked
+          scene.remove(e.mesh);
+          eggs.splice(i,1);
+          spawnEggSplatter(pos);
+          break;
+        }
+      }
+    }
+  }
+}
+
+
 function useAbility(k,victims){
   if(!k.abReady)return;
   k.abReady=false;k.abCd=k.char.cd;
@@ -1545,8 +1727,6 @@ function useAbility(k,victims){
   if(k.char.id==='honker'){
     spawnShockwave(k.pos,0xFFDD00,victims);
     if(ip){flash('#FFD700',0.45);floatMsg('💛 MEGA HONK!','#FFD700');}
-  } else if(k.char.id==='grey'){
-    k.boost=1000;if(ip){flash('#7DF9FF',0.3);floatMsg('❄️ ICE GLIDE!','#7DF9FF');}
   } else if(k.char.id==='canada'){
     // Aim at the nearest victim that is ahead of the kart
     let aimAng=k.angle;
@@ -1587,9 +1767,11 @@ function useAbility(k,victims){
     const pm={mesh:group,pos:k.pos.clone(),dx:-Math.sin(aimAng)*1.4,dz:-Math.cos(aimAng)*1.4,life:5500,victims,spin:0.14};
     projs.push(pm);
     if(ip){flash('#FFFFFF',0.35);floatMsg('🪶 FEATHER BLAST!','#fff');}
-  } else {
-    k.boost=0; // ability not yet implemented
+  } else if(k.char.id==='golden'){
+    spawnEggs(k,victims);
+    if(ip){flash('#FFD700',0.45);floatMsg('🥚 EGG DROP!','#FFD700');}
   }
+  // racer has no ability — cd:99999 means this is never reached
 }
 
 function botAI(b){
@@ -1606,10 +1788,23 @@ function botAI(b){
       return dot>0.5; // must be within ~60° cone ahead
     });
     if(target)useAbility(b,others);
+  } else if(b.char.id==='golden'){
+    // Drop eggs if someone is close behind
+    const facingX=-Math.sin(b.angle), facingZ=-Math.cos(b.angle);
+    const behind=others.some(k=>{
+      const dx=k.pos.x-b.pos.x, dz=k.pos.z-b.pos.z;
+      const dist=Math.sqrt(dx*dx+dz*dz);
+      if(dist>22||dist<0.001)return false;
+      const dot=dx/dist*facingX+dz/dist*facingZ;
+      return dot<-0.3; // behind
+    });
+    if(behind)useAbility(b,others);
+  } else if(b.char.id==='racer'){
+    return; // no ability — pure racer
   } else {
+    // honker — use when anyone is nearby
     const near=others.some(k=>Math.hypot(b.pos.x-k.pos.x,b.pos.z-k.pos.z)<20);
-    const self=b.char.id==='grey'||b.char.id==='golden';
-    if(near||(self&&Math.random()<0.008))useAbility(b,others);
+    if(near)useAbility(b,others);
   }
 }
 
@@ -1673,7 +1868,11 @@ function startCD(){
   function tick(){
     el.textContent=seq[i++];
     if(i<seq.length)setTimeout(tick,900);
-    else setTimeout(()=>{el.style.display='none';cdActive=false;racing=true;},700);
+    else setTimeout(()=>{
+      el.style.display='none';cdActive=false;racing=true;
+      // Give bots a pre-loaded launch speed so they don't crawl off the line
+      bots.forEach(b=>{b.spd=MAXSPD*selDiff.launchSpd;});
+    },700);
   }
   tick();
 }
@@ -1690,38 +1889,53 @@ function loop(){
     if(raceStartTimer>1.5)resolveCollisions();
     updateProjs(dt);
     updateShockwaves(dt);
+    updateEggs(dt);
     updateHUD(dt);
   }
   updateCam();
   drawMinimap();
   renderer.render(scene,camera);
+  const nextCp=(player.cp+1)%NCP;
+  const distToNext=Math.hypot(player.pos.x-trackPts[nextCp].x,player.pos.z-trackPts[nextCp].z);
   document.getElementById('dbg').textContent=
-    'racing='+racing+' cd='+cdActive+' spd='+player.spd.toFixed(3)+' W='+!!keys['KeyW']+' up='+!!keys['ArrowUp'];
+    'lap='+player.lap+' cp='+player.cp+'/'+NCP+' nextDist='+distToNext.toFixed(1)+' totalCPs='+player.totalCPs;
 }
 
 // ── MENU ──────────────────────────────────────────────────────────────────────
 (function(){
-  let scid=CHARS[0].id,stid=TRACKS[0].id;
+  let scid=null,stid=null,sdid='normal';
   const cg=document.getElementById('cgrid');
-  CHARS.forEach(ch=>{
-    const d=document.createElement('div');d.className='ccard'+(ch.id===scid?' sel':'');
+  CHARS.filter(c=>c.id!=='racer').forEach(ch=>{
+    const d=document.createElement('div');d.className='ccard';
     d.innerHTML='<div class="cemoji">'+ch.emoji+'</div><div class="cname">'+ch.name+'</div><div class="cabl">'+ch.ability+'</div><div class="cabl" style="color:#888;font-size:10px">'+ch.desc+'</div>';
     d.onclick=()=>{document.querySelectorAll('.ccard').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');scid=ch.id;};
     cg.appendChild(d);
   });
   const tg=document.getElementById('tgrid');
   TRACKS.forEach(tk=>{
-    const d=document.createElement('div');d.className='tcard'+(tk.id===stid?' sel':'');
+    const d=document.createElement('div');d.className='tcard';
     d.innerHTML='<div class="temoji">'+tk.emoji+'</div><div class="tname">'+tk.name+'</div>';
     d.onclick=()=>{document.querySelectorAll('.tcard').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');stid=tk.id;};
     tg.appendChild(d);
   });
+  const dg=document.getElementById('dgrid');
+  DIFFICULTIES.forEach(df=>{
+    const d=document.createElement('div');d.className='dcard'+(df.id==='normal'?' sel':'');
+    d.innerHTML='<div style="font-size:22px">'+df.emoji+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:'+df.color+';margin-top:4px">'+df.label+'</div>';
+    d.onclick=()=>{document.querySelectorAll('.dcard').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');sdid=df.id;};
+    dg.appendChild(d);
+  });
   document.getElementById('sbtn').onclick=()=>{
-    selChar=CHARS.find(c=>c.id===scid);selTrack=TRACKS.find(t=>t.id===stid);
+    if(!scid){floatMsg('Pick a goose!','#FF4444');return;}
+    if(!stid){floatMsg('Pick a track!','#FF4444');return;}
+    selChar=CHARS.find(c=>c.id===scid);
+    selTrack=TRACKS.find(t=>t.id===stid);
+    selDiff=DIFFICULTIES.find(d=>d.id===sdid);
     document.getElementById('menu').style.display='none';
     document.getElementById('hud').style.display='flex';
     document.getElementById('trkind').style.display='block';
-    document.getElementById('trkind').textContent=selTrack.emoji+' '+selTrack.name.toUpperCase();
+    document.getElementById('trkind').textContent=selTrack.emoji+' '+selTrack.name.toUpperCase()+' · '+selDiff.emoji+' '+selDiff.label.toUpperCase();
     document.getElementById('abbar').style.display='flex';
     document.getElementById('abicon').textContent=selChar.emoji;
     document.getElementById('ablbl').innerHTML=selChar.ability+'<br><span style="color:#aaa;font-size:11px">SPACE</span>';

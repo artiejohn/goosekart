@@ -5,6 +5,7 @@
 <title>🪿 Honk Kart</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
+html{overflow:hidden;}
 body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;}
 canvas#c{display:block;width:100vw;height:100vh;}
 #hud{position:fixed;top:12px;left:50%;transform:translateX(-50%);
@@ -26,17 +27,18 @@ canvas#c{display:block;width:100vw;height:100vh;}
 #trkind{position:fixed;top:14px;right:14px;display:none;
   background:rgba(0,0,0,.7);color:#fff;padding:6px 14px;border-radius:8px;font-size:14px;}
 #menu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;background:transparent;z-index:92;gap:14px;}
-#menu h1{font-size:52px;color:#FFD700;text-shadow:3px 3px 0 #000;margin-top:80px;}
-#menuPanel{display:flex;flex-direction:column;align-items:center;gap:14px;max-height:90vh;overflow-y:auto;}
-.mlbl{color:#aaa;font-size:13px;letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
-.cgrid,.tgrid,.dgrid{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+  justify-content:center;background:transparent;z-index:92;overflow:hidden;}
+#menu h1{font-size:52px;color:#FFD700;text-shadow:3px 3px 0 #000;}
+#titleArt{margin-top:8px;margin-bottom:0;}
+#menuPanel{display:flex;flex-direction:column;align-items:center;gap:8px;max-height:100vh;overflow:hidden;padding:4px 0;}
+.mlbl{color:#aaa;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.cgrid,.tgrid,.dgrid{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
 .ccard,.tcard,.dcard{background:#1a1a1a;border:2px solid #444;border-radius:12px;
-  padding:12px 16px;cursor:pointer;text-align:center;color:#fff;transition:all .15s;}
+  padding:8px 12px;cursor:pointer;text-align:center;color:#fff;transition:all .15s;}
 .ccard:hover,.tcard:hover,.dcard:hover,.ccard.sel,.tcard.sel,.dcard.sel{border-color:#FFD700;background:#221f00;}
-.cemoji,.temoji{font-size:30px;}.cname,.tname{font-size:12px;font-weight:700;margin-top:4px;}
-.cabl{font-size:11px;color:#FFD700;margin-top:2px;}
-#sbtn{margin-top:8px;padding:14px 48px;font-size:20px;font-weight:900;
+.cemoji,.temoji{font-size:26px;}.cname,.tname{font-size:12px;font-weight:700;margin-top:2px;}
+.cabl{font-size:10px;color:#FFD700;margin-top:1px;}
+#sbtn{margin-top:4px;padding:10px 40px;font-size:18px;font-weight:900;
   background:#FFD700;color:#000;border:none;border-radius:12px;cursor:pointer;}
 #sbtn:hover{background:#ffe840;}
 #fin{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
@@ -71,15 +73,88 @@ canvas#c{display:block;width:100vw;height:100vh;}
 <div id="dbg"></div>
 <div id="menu">
   <div id="menuPanel">
-  <h1>🪿 GOOSE KART</h1>
-  <div style="color:#aaffaa;font-size:18px;letter-spacing:3px;">GOOSE GRAND PRIX</div>
+  <div id="titleArt">
+    <svg viewBox="0 0 520 130" xmlns="http://www.w3.org/2000/svg" style="width:min(440px,85vw);display:block;margin:0 auto 2px;">
+      <defs>
+        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#FFE566"/>
+          <stop offset="50%" style="stop-color:#FFD700"/>
+          <stop offset="100%" style="stop-color:#B8860B"/>
+        </linearGradient>
+        <linearGradient id="whiteGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#ffffff"/>
+          <stop offset="100%" style="stop-color:#cccccc"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="shadow">
+          <feDropShadow dx="3" dy="3" stdDeviation="2" flood-color="#000" flood-opacity="0.7"/>
+        </filter>
+      </defs>
+
+      <!-- Shadow letters behind -->
+      <text x="8" y="88" font-family="Impact, 'Arial Black', sans-serif" font-size="78" font-weight="900" fill="#000" opacity="0.5" letter-spacing="2">GOOSE</text>
+      <text x="285" y="88" font-family="Impact, 'Arial Black', sans-serif" font-size="78" font-weight="900" fill="#000" opacity="0.5" letter-spacing="2">KART</text>
+
+      <!-- Gold main letters -->
+      <text x="5" y="85" font-family="Impact, 'Arial Black', sans-serif" font-size="78" font-weight="900" fill="url(#goldGrad)" filter="url(#shadow)" letter-spacing="2">GOOSE</text>
+      <text x="282" y="85" font-family="Impact, 'Arial Black', sans-serif" font-size="78" font-weight="900" fill="url(#goldGrad)" filter="url(#shadow)" letter-spacing="2">KART</text>
+
+      <!-- White outline stroke -->
+      <text x="5" y="85" font-family="Impact, 'Arial Black', sans-serif" font-size="78" font-weight="900" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.4" letter-spacing="2">GOOSE</text>
+      <text x="282" y="85" font-family="Impact, 'Arial Black', sans-serif" font-size="78" font-weight="900" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.4" letter-spacing="2">KART</text>
+
+      <!-- Goose illustration between words -->
+      <!-- Body -->
+      <ellipse cx="252" cy="72" rx="22" ry="16" fill="url(#whiteGrad)" filter="url(#shadow)"/>
+      <!-- Wing -->
+      <ellipse cx="248" cy="74" rx="16" ry="10" fill="#ddd" transform="rotate(-10,248,74)"/>
+      <!-- Neck -->
+      <path d="M 258 60 Q 262 45 258 35" stroke="url(#whiteGrad)" stroke-width="9" fill="none" stroke-linecap="round"/>
+      <!-- Head -->
+      <circle cx="257" cy="32" r="10" fill="url(#whiteGrad)" filter="url(#shadow)"/>
+      <!-- Beak -->
+      <path d="M 264 31 L 276 29 L 264 34 Z" fill="#FFA500"/>
+      <!-- Beak tip -->
+      <path d="M 272 29 L 276 29 L 274 32 Z" fill="#cc7700"/>
+      <!-- Eye -->
+      <circle cx="261" cy="30" r="3" fill="#111"/>
+      <circle cx="262" cy="29" r="1" fill="#fff"/>
+      <!-- Eye glow -->
+      <circle cx="261" cy="30" r="4" fill="none" stroke="#FF4444" stroke-width="1" opacity="0.8" filter="url(#glow)"/>
+      <!-- Tail feathers -->
+      <path d="M 230 68 Q 218 60 220 72 Q 218 80 230 76" fill="#ddd"/>
+      <path d="M 230 72 Q 215 66 218 78 Q 217 86 230 80" fill="#ccc"/>
+      <!-- Legs -->
+      <line x1="248" y1="86" x2="244" y2="96" stroke="#FFA500" stroke-width="3" stroke-linecap="round"/>
+      <line x1="256" y1="87" x2="254" y2="97" stroke="#FFA500" stroke-width="3" stroke-linecap="round"/>
+      <!-- Feet -->
+      <path d="M 240 96 L 244 96 L 246 98" stroke="#FFA500" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M 250 97 L 254 97 L 256 99" stroke="#FFA500" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <!-- Speed lines behind goose -->
+      <line x1="218" y1="65" x2="200" y2="63" stroke="#FFD700" stroke-width="2" opacity="0.5"/>
+      <line x1="216" y1="72" x2="195" y2="72" stroke="#FFD700" stroke-width="3" opacity="0.6"/>
+      <line x1="218" y1="79" x2="200" y2="81" stroke="#FFD700" stroke-width="2" opacity="0.5"/>
+
+      <!-- Kart wheels under goose -->
+      <rect x="233" y="88" width="8" height="5" rx="1" fill="#333"/>
+      <circle cx="234" cy="93" r="4" fill="#444" stroke="#666" stroke-width="1"/>
+      <circle cx="234" cy="93" r="1.5" fill="#888"/>
+      <circle cx="260" cy="93" r="4" fill="#444" stroke="#666" stroke-width="1"/>
+      <circle cx="260" cy="93" r="1.5" fill="#888"/>
+      <rect x="231" y="88" width="32" height="6" rx="2" fill="#FF3333" opacity="0.8"/>
+    </svg>
+    <div style="color:#aaffaa;font-family:'Courier New',monospace;font-size:13px;letter-spacing:6px;text-align:center;margin-top:-2px;text-shadow:0 0 8px #aaffaa88;">GOOSE GRAND PRIX</div>
+  </div>
   <div class="mlbl">Choose Your Goose</div>
   <div class="cgrid" id="cgrid"></div>
   <div class="mlbl">Select Track</div>
   <div class="tgrid" id="tgrid"></div>
   <div class="mlbl">Difficulty</div>
   <div class="dgrid" id="dgrid"></div>
-  <button id="sbtn">🪿 HONK TO START!</button>
+  <button id="sbtn">HONK TO START!</button>
   <div style="color:#666;font-size:12px;">WASD / Arrow keys · SPACE for ability</div>
   </div>
 </div>
@@ -1905,24 +1980,292 @@ function loop(){
 (function(){
   let scid=null,stid=null,sdid='normal';
   const cg=document.getElementById('cgrid');
+
+  function charSVG(id){
+    const s=`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" width="54" height="54">`;
+    if(id==='honker') return s+`
+      <defs><radialGradient id="hg" cx="50%" cy="40%"><stop offset="0%" stop-color="#fffff0"/><stop offset="100%" stop-color="#d4cba0"/></radialGradient></defs>
+      <!-- Body -->
+      <ellipse cx="30" cy="38" rx="18" ry="13" fill="url(#hg)"/>
+      <!-- Wing -->
+      <ellipse cx="26" cy="40" rx="13" ry="8" fill="#ddd8b0" transform="rotate(-8,26,40)"/>
+      <!-- Neck -->
+      <path d="M36 28 Q40 18 36 10" stroke="#fffff0" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <!-- Head -->
+      <circle cx="35" cy="9" r="9" fill="#fffff0"/>
+      <!-- Beak -->
+      <path d="M41 8 L52 6 L41 11 Z" fill="#FFA500"/>
+      <path d="M48 6 L52 6 L50 9 Z" fill="#cc7700"/>
+      <!-- Eye -->
+      <circle cx="39" cy="7" r="3" fill="#111"/>
+      <circle cx="40" cy="6" r="1" fill="#fff"/>
+      <circle cx="39" cy="7" r="3.5" fill="none" stroke="#FF4444" stroke-width="0.8" opacity="0.9"/>
+      <!-- Crown/top hat -->
+      <rect x="28" y="-1" width="14" height="3" rx="1" fill="#333"/>
+      <rect x="30" y="-8" width="10" height="8" rx="1" fill="#222"/>
+      <!-- Legs -->
+      <line x1="25" y1="50" x2="22" y2="58" stroke="#FFA500" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="33" y1="51" x2="32" y2="58" stroke="#FFA500" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M19 58 L22 58 L24 60" stroke="#FFA500" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M28 58 L32 58 L34 60" stroke="#FFA500" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    </svg>`;
+    if(id==='canada') return s+`
+      <defs>
+        <linearGradient id="cBody" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#2a2a2a"/><stop offset="100%" stop-color="#111"/>
+        </linearGradient>
+      </defs>
+      <!-- Body — dark charcoal -->
+      <ellipse cx="28" cy="38" rx="19" ry="13" fill="url(#cBody)"/>
+      <!-- White belly patch — distinctive Canadian goose marking -->
+      <ellipse cx="29" cy="42" rx="11" ry="7" fill="#e8e8e8"/>
+      <!-- Wing detail -->
+      <ellipse cx="22" cy="37" rx="12" ry="7" fill="#333" transform="rotate(-5,22,37)"/>
+      <!-- Wing feather lines -->
+      <line x1="14" y1="35" x2="26" y2="38" stroke="#555" stroke-width="1" opacity="0.8"/>
+      <line x1="14" y1="38" x2="26" y2="40" stroke="#555" stroke-width="1" opacity="0.8"/>
+      <!-- Neck — black, thick -->
+      <path d="M33 27 Q37 17 34 9" stroke="#111" stroke-width="9" fill="none" stroke-linecap="round"/>
+      <!-- White chin strap — THE Canadian goose feature -->
+      <path d="M29 17 Q27 20 29 23 Q31 26 34 25" stroke="#e8e8e8" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <!-- Head — black -->
+      <circle cx="33" cy="8" r="9" fill="#111"/>
+      <!-- White cheek patch -->
+      <ellipse cx="29" cy="10" rx="5" ry="4" fill="#e8e8e8"/>
+      <!-- Beak — dark grey/brown -->
+      <path d="M39 7 L50 5 L39 10 Z" fill="#555"/>
+      <path d="M46 5 L50 5 L48 8 Z" fill="#333"/>
+      <!-- Eye — small bright -->
+      <circle cx="36" cy="6" r="2.5" fill="#1a1a1a"/>
+      <circle cx="37" cy="5.5" r="1" fill="#fff"/>
+      <!-- Maple leaf on body -->
+      <text x="30" y="42" font-size="11" fill="#CC0000" text-anchor="middle">🍁</text>
+      <!-- Feather projectile -->
+      <line x1="42" y1="12" x2="54" y2="2" stroke="#e8e8e8" stroke-width="2.5" stroke-linecap="round"/>
+      <ellipse cx="48" cy="7" rx="3" ry="6" fill="#ddd" opacity="0.5" transform="rotate(-45,48,7)"/>
+      <!-- Legs -->
+      <line x1="23" y1="50" x2="20" y2="57" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="31" y1="51" x2="30" y2="57" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M17 57 L20 57 L22 59" stroke="#888" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M27 57 L30 57 L32 59" stroke="#888" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    </svg>`;
+    if(id==='golden') return s+`
+      <defs>
+        <radialGradient id="gg" cx="50%" cy="35%"><stop offset="0%" stop-color="#FFE566"/><stop offset="100%" stop-color="#B8860B"/></radialGradient>
+        <radialGradient id="eg" cx="50%" cy="35%"><stop offset="0%" stop-color="#fff8cc"/><stop offset="100%" stop-color="#FFD700"/></radialGradient>
+      </defs>
+      <!-- Body -->
+      <ellipse cx="30" cy="38" rx="18" ry="13" fill="url(#gg)"/>
+      <!-- Sheen -->
+      <ellipse cx="24" cy="32" rx="6" ry="4" fill="#FFE566" opacity="0.5" transform="rotate(-20,24,32)"/>
+      <!-- Neck -->
+      <path d="M36 28 Q40 18 36 10" stroke="#FFD700" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <!-- Head -->
+      <circle cx="35" cy="9" r="9" fill="url(#gg)"/>
+      <!-- Beak -->
+      <path d="M41 8 L52 6 L41 11 Z" fill="#FF8800"/>
+      <path d="M48 6 L52 6 L50 9 Z" fill="#cc5500"/>
+      <!-- Eye — golden glow -->
+      <circle cx="39" cy="7" r="3" fill="#7a5000"/>
+      <circle cx="40" cy="6" r="1" fill="#FFE566"/>
+      <circle cx="39" cy="7" r="4" fill="none" stroke="#FFD700" stroke-width="1" opacity="0.8"/>
+      <!-- Egg -->
+      <ellipse cx="18" cy="46" rx="6" ry="7" fill="url(#eg)" stroke="#FFD700" stroke-width="1"/>
+      <ellipse cx="16" cy="43" rx="2" ry="3" fill="#fff" opacity="0.3"/>
+      <!-- Star sparkles -->
+      <text x="2" y="18" font-size="10" fill="#FFD700">✦</text>
+      <text x="48" y="24" font-size="7" fill="#FFE566">✦</text>
+      <!-- Legs -->
+      <line x1="25" y1="50" x2="22" y2="58" stroke="#FF8800" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="33" y1="51" x2="32" y2="58" stroke="#FF8800" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M19 58 L22 58 L24 60" stroke="#FF8800" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M28 58 L32 58 L34 60" stroke="#FF8800" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    </svg>`;
+    return `<svg viewBox="0 0 60 60" width="54" height="54"><text y="40" font-size="36">🪿</text></svg>`;
+  }
+
+  function diffSVG(id){
+    if(id==='easy') return `<svg viewBox="0 0 54 54" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+      <!-- Chick body -->
+      <ellipse cx="27" cy="34" rx="16" ry="13" fill="#FFE566"/>
+      <!-- Wing nubs -->
+      <ellipse cx="14" cy="36" rx="6" ry="5" fill="#FFD700" transform="rotate(15,14,36)"/>
+      <ellipse cx="40" cy="36" rx="6" ry="5" fill="#FFD700" transform="rotate(-15,40,36)"/>
+      <!-- Head -->
+      <circle cx="27" cy="20" r="13" fill="#FFE566"/>
+      <!-- Beak — tiny -->
+      <path d="M27 22 L31 24 L27 26 Z" fill="#FFA500"/>
+      <!-- Eyes — big cute -->
+      <circle cx="22" cy="18" r="4" fill="#111"/>
+      <circle cx="32" cy="18" r="4" fill="#111"/>
+      <circle cx="23" cy="17" r="1.5" fill="#fff"/>
+      <circle cx="33" cy="17" r="1.5" fill="#fff"/>
+      <!-- Tiny feet -->
+      <line x1="21" y1="47" x2="18" y2="53" stroke="#FFA500" stroke-width="2" stroke-linecap="round"/>
+      <line x1="33" y1="47" x2="36" y2="53" stroke="#FFA500" stroke-width="2" stroke-linecap="round"/>
+      <path d="M15 53 L18 53 L20 53" stroke="#FFA500" stroke-width="1.5" fill="none"/>
+      <path d="M33 53 L36 53 L38 53" stroke="#FFA500" stroke-width="1.5" fill="none"/>
+    </svg>`;
+    if(id==='normal') return `<svg viewBox="0 0 54 54" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+      <defs><radialGradient id="ng" cx="50%" cy="40%"><stop offset="0%" stop-color="#fffff0"/><stop offset="100%" stop-color="#d4cba0"/></radialGradient></defs>
+      <!-- Normal goose — standard -->
+      <ellipse cx="27" cy="36" rx="16" ry="12" fill="url(#ng)"/>
+      <path d="M33 26 Q37 16 33 8" stroke="#fffff0" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <circle cx="32" cy="7" r="8" fill="#fffff0"/>
+      <path d="M37 6 L47 4 L37 9 Z" fill="#FFA500"/>
+      <circle cx="35" cy="5" r="2.5" fill="#111"/>
+      <circle cx="36" cy="4.5" r="1" fill="#fff"/>
+      <line x1="22" y1="47" x2="19" y2="53" stroke="#FFA500" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="30" y1="48" x2="29" y2="53" stroke="#FFA500" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>`;
+    if(id==='hard') return `<svg viewBox="0 0 54 54" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+      <defs><radialGradient id="fg" cx="50%" cy="40%"><stop offset="0%" stop-color="#ff6622"/><stop offset="100%" stop-color="#aa2200"/></radialGradient></defs>
+      <!-- Angry goose on fire -->
+      <!-- Flame behind -->
+      <path d="M18 52 Q10 38 18 28 Q14 36 22 32 Q16 42 26 38 Q20 48 30 44 Q26 52 18 52" fill="#FF4400" opacity="0.7"/>
+      <path d="M36 52 Q44 38 36 28 Q40 36 32 32 Q38 42 28 38 Q34 48 30 44 Q34 52 36 52" fill="#FF8800" opacity="0.7"/>
+      <path d="M27 30 Q22 22 27 14 Q24 20 30 17 Q26 24 32 22 Q30 30 27 30" fill="#FFD700" opacity="0.8"/>
+      <!-- Body darker/angrier -->
+      <ellipse cx="27" cy="36" rx="16" ry="12" fill="#555"/>
+      <path d="M33 26 Q37 16 33 8" stroke="#444" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <circle cx="32" cy="7" r="8" fill="#444"/>
+      <!-- Angry brow -->
+      <path d="M28 3 L36 5" stroke="#FF4400" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M37 6 L48 4 L37 10 Z" fill="#FF6600"/>
+      <!-- Eyes — angry red glow -->
+      <circle cx="35" cy="6" r="3" fill="#FF2200"/>
+      <circle cx="36" cy="5" r="1" fill="#ffaa00"/>
+      <line x1="22" y1="47" x2="19" y2="53" stroke="#FF6600" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="30" y1="48" x2="29" y2="53" stroke="#FF6600" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>`;
+    return '';
+  }
+
   CHARS.filter(c=>c.id!=='racer').forEach(ch=>{
     const d=document.createElement('div');d.className='ccard';
-    d.innerHTML='<div class="cemoji">'+ch.emoji+'</div><div class="cname">'+ch.name+'</div><div class="cabl">'+ch.ability+'</div><div class="cabl" style="color:#888;font-size:10px">'+ch.desc+'</div>';
+    d.innerHTML=charSVG(ch.id)+'<div class="cname">'+ch.name+'</div><div class="cabl">'+ch.ability+'</div><div class="cabl" style="color:#888;font-size:10px">'+ch.desc+'</div>';
     d.onclick=()=>{document.querySelectorAll('.ccard').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');scid=ch.id;};
     cg.appendChild(d);
   });
+  function trackSVG(id){
+    if(id==='snow') return `<svg viewBox="0 0 80 54" width="72" height="54" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="sky_s" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#8BBFD4"/><stop offset="100%" stop-color="#c5dfe8"/>
+        </linearGradient>
+      </defs>
+      <!-- Sky -->
+      <rect width="80" height="54" fill="url(#sky_s)" rx="6"/>
+      <!-- Snow ground -->
+      <ellipse cx="40" cy="58" rx="50" ry="22" fill="#EEF8FF"/>
+      <!-- Snow hills -->
+      <ellipse cx="10" cy="46" rx="18" ry="10" fill="#ddeeff"/>
+      <ellipse cx="70" cy="48" rx="15" ry="9" fill="#ddeeff"/>
+      <!-- Pine tree left -->
+      <rect x="6" y="28" width="3" height="8" fill="#775533"/>
+      <polygon points="7.5,8 1,30 14,30" fill="#BBDDFF"/>
+      <polygon points="7.5,14 2,28 13,28" fill="#CCEEFF"/>
+      <!-- Pine tree right -->
+      <rect x="62" y="30" width="3" height="7" fill="#775533"/>
+      <polygon points="63.5,12 58,32 69,32" fill="#BBDDFF"/>
+      <!-- Snowman centre -->
+      <circle cx="40" cy="44" r="5" fill="#fff" stroke="#ccd" stroke-width="0.5"/>
+      <circle cx="40" cy="37" r="4" fill="#fff" stroke="#ccd" stroke-width="0.5"/>
+      <circle cx="40" cy="32" r="3" fill="#fff" stroke="#ccd" stroke-width="0.5"/>
+      <circle cx="39" cy="31" r="0.8" fill="#333"/>
+      <circle cx="41" cy="31" r="0.8" fill="#333"/>
+      <path d="M38.5 33 L40 33.5 L41.5 33" stroke="#FF6600" stroke-width="1" fill="none" stroke-linecap="round"/>
+      <!-- Snowflakes -->
+      <text x="20" y="20" font-size="7" fill="#fff" opacity="0.8">❄</text>
+      <text x="55" y="16" font-size="6" fill="#fff" opacity="0.7">❄</text>
+      <text x="35" y="12" font-size="5" fill="#fff" opacity="0.6">❄</text>
+    </svg>`;
+    if(id==='forest') return `<svg viewBox="0 0 80 54" width="72" height="54" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="sky_f" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#0a1a0a"/><stop offset="100%" stop-color="#1a3a1a"/>
+        </linearGradient>
+      </defs>
+      <!-- Dark sky -->
+      <rect width="80" height="54" fill="url(#sky_f)" rx="6"/>
+      <!-- Ground -->
+      <ellipse cx="40" cy="60" rx="50" ry="20" fill="#0d3a0d"/>
+      <!-- Background trees (dark) -->
+      <polygon points="15,38 8,54 22,54" fill="#071a07"/>
+      <polygon points="65,36 58,54 72,54" fill="#071a07"/>
+      <polygon points="40,32 33,54 47,54" fill="#0a2a0a"/>
+      <!-- Foreground trees with detail -->
+      <rect x="4" y="36" width="4" height="14" fill="#2d1205"/>
+      <polygon points="6,10 0,38 12,38" fill="#071a07"/>
+      <polygon points="6,18 1,34 11,34" fill="#1a5c0a"/>
+      <rect x="60" y="34" width="4" height="16" fill="#2d1205"/>
+      <polygon points="62,8 56,36 68,36" fill="#071a07"/>
+      <polygon points="62,16 57,32 67,32" fill="#1a5c0a"/>
+      <!-- Glowing orbs -->
+      <circle cx="30" cy="38" r="2" fill="#AAff44" opacity="0.9"/>
+      <circle cx="30" cy="38" r="4" fill="#AAff44" opacity="0.2"/>
+      <circle cx="52" cy="34" r="1.5" fill="#AAff44" opacity="0.8"/>
+      <circle cx="52" cy="34" r="3" fill="#AAff44" opacity="0.15"/>
+      <!-- Mushroom -->
+      <rect x="38" y="48" width="2" height="4" fill="#DDBBA0"/>
+      <ellipse cx="39" cy="48" rx="4" ry="2.5" fill="#CC2200"/>
+      <circle cx="38" cy="47" r="0.6" fill="#fff"/>
+      <circle cx="40" cy="46.5" r="0.6" fill="#fff"/>
+      <!-- Moon -->
+      <circle cx="65" cy="12" r="6" fill="#ffffcc"/>
+      <circle cx="67" cy="10" r="5" fill="#1a3a1a"/>
+    </svg>`;
+    if(id==='grass') return `<svg viewBox="0 0 80 54" width="72" height="54" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="sky_g" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#5BB8FF"/><stop offset="100%" stop-color="#99DDFF"/>
+        </linearGradient>
+      </defs>
+      <!-- Sky -->
+      <rect width="80" height="54" fill="url(#sky_g)" rx="6"/>
+      <!-- Clouds -->
+      <ellipse cx="20" cy="12" rx="10" ry="5" fill="#fff" opacity="0.9"/>
+      <ellipse cx="15" cy="13" rx="7" ry="4" fill="#fff" opacity="0.9"/>
+      <ellipse cx="26" cy="13" rx="7" ry="4" fill="#fff" opacity="0.9"/>
+      <ellipse cx="58" cy="10" rx="8" ry="4" fill="#fff" opacity="0.8"/>
+      <ellipse cx="53" cy="11" rx="6" ry="3" fill="#fff" opacity="0.8"/>
+      <ellipse cx="63" cy="11" rx="6" ry="3" fill="#fff" opacity="0.8"/>
+      <!-- Rolling hills -->
+      <ellipse cx="20" cy="54" rx="30" ry="18" fill="#2db832"/>
+      <ellipse cx="65" cy="56" rx="28" ry="16" fill="#28a82d"/>
+      <!-- Flowers -->
+      <circle cx="12" cy="38" r="2" fill="#FFD700"/>
+      <circle cx="30" cy="42" r="1.5" fill="#FF6699"/>
+      <circle cx="55" cy="40" r="2" fill="#FF4466"/>
+      <circle cx="68" cy="38" r="1.5" fill="#FFD700"/>
+      <!-- Sun -->
+      <circle cx="68" cy="10" r="7" fill="#FFE566"/>
+      <line x1="68" y1="1" x2="68" y2="3" stroke="#FFD700" stroke-width="1.5"/>
+      <line x1="74" y1="4" x2="73" y2="5.5" stroke="#FFD700" stroke-width="1.5"/>
+      <line x1="77" y1="10" x2="75" y2="10" stroke="#FFD700" stroke-width="1.5"/>
+      <!-- Distant trees -->
+      <rect x="38" y="32" width="3" height="9" fill="#1a7a1a"/>
+      <ellipse cx="39.5" cy="30" rx="5" ry="7" fill="#2db832"/>
+      <rect x="48" y="34" width="2" height="7" fill="#1a7a1a"/>
+      <ellipse cx="49" cy="32" rx="4" ry="6" fill="#33cc33"/>
+      <!-- Track peek -->
+      <path d="M10 50 Q40 44 70 50" stroke="#222" stroke-width="4" fill="none" opacity="0.5"/>
+      <path d="M20 50 Q40 45 60 50" stroke="#444" stroke-width="2" fill="none" opacity="0.4"/>
+    </svg>`;
+    return '';
+  }
+
   const tg=document.getElementById('tgrid');
   TRACKS.forEach(tk=>{
     const d=document.createElement('div');d.className='tcard';
-    d.innerHTML='<div class="temoji">'+tk.emoji+'</div><div class="tname">'+tk.name+'</div>';
+    d.innerHTML=trackSVG(tk.id)+'<div class="tname">'+tk.name+'</div>';
     d.onclick=()=>{document.querySelectorAll('.tcard').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');stid=tk.id;};
     tg.appendChild(d);
   });
   const dg=document.getElementById('dgrid');
   DIFFICULTIES.forEach(df=>{
     const d=document.createElement('div');d.className='dcard'+(df.id==='normal'?' sel':'');
-    d.innerHTML='<div style="font-size:22px">'+df.emoji+'</div>'
-      +'<div style="font-size:13px;font-weight:700;color:'+df.color+';margin-top:4px">'+df.label+'</div>';
+    d.innerHTML=diffSVG(df.id)+'<div style="font-size:12px;font-weight:700;color:'+df.color+';margin-top:3px">'+df.label+'</div>';
     d.onclick=()=>{document.querySelectorAll('.dcard').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');sdid=df.id;};
     dg.appendChild(d);
   });

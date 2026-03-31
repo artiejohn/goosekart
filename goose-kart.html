@@ -192,6 +192,8 @@ const DIFFICULTIES=[
   {id:'normal',   label:'Normal',    emoji:'🪿', color:'#FFD700',
    spdMult:1.18, launchSpd:0.55, lookahead:26, cornerLoad:0.35, turnMult:1.4, accel:1.3, cdMult:1.0},
   {id:'hard',     label:'Hard',      emoji:'🔥', color:'#FF8800',
+   spdMult:1.18, launchSpd:0.55, lookahead:33, cornerLoad:0.25, turnMult:1.7, accel:1.55, cdMult:0.7},
+  {id:'impossible',label:'Impossible',emoji:'💀', color:'#FF2222',
    spdMult:1.18, launchSpd:0.55, lookahead:40, cornerLoad:0.15, turnMult:2.0, accel:1.8, cdMult:0.4},
 ];
 const TRACK_CTRL={
@@ -1697,6 +1699,39 @@ function updateBot(b,dt){
     ta+=eda*eggStrength;
   }
 
+  // ── TRACK HAZARD AVOIDANCE ─────────────────────────────────────────────────
+  // Bots probe ahead along their heading to detect hazards early
+  const HAZARD_SENSE=18;
+  const HAZARD_LOOKAHEAD=12;
+  let hazPushX=0, hazPushZ=0;
+  for(const h of trackHazards){
+    if(h.triggered||h.removed) continue;
+    for(const probeScale of [0, 0.5, 1.0]){
+      const probeX=b.pos.x - Math.sin(b.angle)*HAZARD_LOOKAHEAD*probeScale;
+      const probeZ=b.pos.z - Math.cos(b.angle)*HAZARD_LOOKAHEAD*probeScale;
+      const hx=probeX-h.x, hz=probeZ-h.z;
+      const hdist=Math.sqrt(hx*hx+hz*hz);
+      if(hdist<HAZARD_SENSE && hdist>0.001){
+        const strength=((HAZARD_SENSE-hdist)/HAZARD_SENSE)**1.5*(probeScale===0?2.5:1.8);
+        const bx=b.pos.x-h.x, bz=b.pos.z-h.z;
+        const bd=Math.sqrt(bx*bx+bz*bz)||1;
+        hazPushX+=bx/bd*strength;
+        hazPushZ+=bz/bd*strength;
+      }
+    }
+  }
+  if(hazPushX!==0||hazPushZ!==0){
+    const hazAng=Math.atan2(-hazPushX,-hazPushZ);
+    let hda=hazAng-ta;
+    while(hda>Math.PI)hda-=Math.PI*2;
+    while(hda<-Math.PI)hda+=Math.PI*2;
+    const hazStrength=Math.min(Math.sqrt(hazPushX*hazPushX+hazPushZ*hazPushZ),1)*0.85;
+    ta+=hda*hazStrength;
+    const closestHaz=trackHazards.filter(h=>!h.triggered&&!h.removed)
+      .reduce((mn,h)=>{ const d=Math.hypot(b.pos.x-h.x,b.pos.z-h.z); return d<mn?d:mn; },Infinity);
+    if(closestHaz<HAZARD_SENSE*0.6) b.spd*=0.97;
+  }
+
   let da=ta-b.angle;
   while(da>Math.PI)da-=Math.PI*2;
   while(da<-Math.PI)da+=Math.PI*2;
@@ -1951,64 +1986,64 @@ function spawnTrackHazard(){
   if(id==='snow'){
     // Ice spike cluster — jagged cyan/white cones bursting from ground
     const iceMat=new THREE.MeshPhongMaterial({color:0xAAEEFF,transparent:true,opacity:0.85,shininess:200,specular:0xffffff});
-    const positions=[[0,0],[2.5,1.5],[-2,1],[ 1,-2.5],[-1.5,-1.5]];
+    const positions=[[0,0],[3.2,1.8],[-2.5,1.2],[ 1.2,-3.0],[-1.8,-1.8]];
     positions.forEach(([ox,oz])=>{
-      const h=3+Math.random()*2.5;
-      const spike=new THREE.Mesh(new THREE.ConeGeometry(0.5+Math.random()*0.3,h,6),iceMat);
+      const h=5+Math.random()*3;
+      const spike=new THREE.Mesh(new THREE.ConeGeometry(0.9+Math.random()*0.5,h,6),iceMat);
       spike.position.set(ox,h/2,oz);
       spike.rotation.y=Math.random()*Math.PI;
       spike.rotation.z=(Math.random()-0.5)*0.3;
       group.add(spike);
     });
-    // Icy glow ring on ground
-    const glowMat=new THREE.MeshBasicMaterial({color:0x88DDFF,transparent:true,opacity:0.4});
-    const glow=new THREE.Mesh(new THREE.CircleGeometry(5,24),glowMat);
-    glow.rotation.x=-Math.PI/2; glow.position.y=0.05;
-    group.add(glow);
   } else if(id==='forest'){
-    // Fallen log — mossy cylinder blocking the track
+    // Log pile — natural but readable
     const logMat=new THREE.MeshLambertMaterial({color:0x5a3010});
-    const mossMat=new THREE.MeshLambertMaterial({color:0x2a6622});
-    const log=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.4,18,10),logMat);
-    log.rotation.z=Math.PI/2;
-    log.position.y=1.2;
-    group.add(log);
-    // Moss strip on top
-    const moss=new THREE.Mesh(new THREE.CylinderGeometry(1.22,1.42,18,10),mossMat);
-    moss.rotation.z=Math.PI/2; moss.position.y=2.0;
-    moss.scale.set(1,0.35,1);
-    group.add(moss);
-    // End rings
-    [-9,9].forEach(ox=>{
-      const ring=new THREE.Mesh(new THREE.CircleGeometry(1.3,16),new THREE.MeshLambertMaterial({color:0x8B4513}));
-      ring.rotation.y=Math.PI/2; ring.position.set(ox,1.2,0);
-      group.add(ring);
+    const endMat=new THREE.MeshLambertMaterial({color:0x7a3e18});
+    // Each log: radius, length, x position, y height, z depth, y-rotation (slight angle)
+    const logs=[
+      // Bottom row: 4 logs, slightly varied thickness and tiny z shifts
+      {r:0.80, len:8.5, x:-4.2, y:0.80, z: 0.2,  ry: 0.04},
+      {r:0.75, len:8.0, x:-1.4, y:0.75, z:-0.3,  ry:-0.05},
+      {r:0.78, len:8.2, x: 1.4, y:0.78, z: 0.4,  ry: 0.03},
+      {r:0.72, len:7.8, x: 4.0, y:0.72, z:-0.2,  ry:-0.06},
+      // Second row: 3 logs nestled in gaps, slightly different lengths
+      {r:0.72, len:7.5, x:-2.8, y:2.10, z: 0.1,  ry:-0.04},
+      {r:0.70, len:7.8, x: 0.0, y:2.08, z:-0.4,  ry: 0.06},
+      {r:0.68, len:7.2, x: 2.8, y:2.12, z: 0.5,  ry:-0.03},
+      // Top row: 2 logs
+      {r:0.65, len:7.0, x:-1.4, y:3.28, z:-0.1,  ry: 0.05},
+      {r:0.63, len:6.8, x: 1.4, y:3.30, z: 0.3,  ry:-0.07},
+    ];
+    logs.forEach(({r,len,x,y,z,ry})=>{
+      const log=new THREE.Mesh(new THREE.CylinderGeometry(r,r*0.95,len,12),logMat);
+      log.rotation.order='YXZ';
+      log.rotation.z=Math.PI/2;
+      log.rotation.y=ry;
+      log.position.set(x,y,z);
+      group.add(log);
+      // End caps
+      [-1,1].forEach(side=>{
+        const cap=new THREE.Mesh(new THREE.CircleGeometry(r,12),endMat);
+        cap.rotation.y=Math.PI/2;
+        cap.position.set(x + side*(len/2)*Math.cos(ry), y, z + side*(len/2)*Math.sin(ry));
+        group.add(cap);
+      });
     });
-    // Warning glow
-    const glowMat=new THREE.MeshBasicMaterial({color:0x226622,transparent:true,opacity:0.3});
-    const glow=new THREE.Mesh(new THREE.CircleGeometry(6,24),glowMat);
-    glow.rotation.x=-Math.PI/2; glow.position.y=0.05;
-    group.add(glow);
   } else {
     // Grass — hay bales scattered across the track
     const hayMat=new THREE.MeshLambertMaterial({color:0xD4A820});
     const bandMat=new THREE.MeshLambertMaterial({color:0xB8860B});
-    [[-4,0],[0,2],[4,-1]].forEach(([ox,oz])=>{
-      const bale=new THREE.Mesh(new THREE.CylinderGeometry(1.6,1.6,2.2,12),hayMat);
+    [[-5,0],[0,2.5],[5,-1.5]].forEach(([ox,oz])=>{
+      const bale=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,3.2,12),hayMat);
       bale.rotation.z=Math.PI/2;
-      bale.position.set(ox,1.1,oz);
+      bale.position.set(ox,1.6,oz);
       group.add(bale);
       // Twine band
-      const band=new THREE.Mesh(new THREE.CylinderGeometry(1.62,1.62,0.25,12),bandMat);
+      const band=new THREE.Mesh(new THREE.CylinderGeometry(2.42,2.42,0.35,12),bandMat);
       band.rotation.z=Math.PI/2;
-      band.position.set(ox,1.1,oz);
+      band.position.set(ox,1.6,oz);
       group.add(band);
     });
-    // Warning glow
-    const glowMat=new THREE.MeshBasicMaterial({color:0xDDCC44,transparent:true,opacity:0.3});
-    const glow=new THREE.Mesh(new THREE.CircleGeometry(6,24),glowMat);
-    glow.rotation.x=-Math.PI/2; glow.position.y=0.05;
-    group.add(glow);
   }
 
   group.position.set(x,0,z);
@@ -2024,19 +2059,19 @@ function updateTrackHazards(dt){
       h.breakT=(h.breakT||0)+dt;
       const t=Math.min(h.breakT*2,1);
       h.group.scale.set(1+t*0.5, Math.max(0.01,1-t), 1+t*0.5);
-      if(h.breakT>0.5){scene.remove(h.group);trackHazards.splice(i,1);}
+      if(h.breakT>0.5 && !h.removed){
+        scene.remove(h.group);
+        h.removed=true;
+        // Respawn after 5 seconds
+        setTimeout(()=>{ if(racing) spawnTrackHazard(); }, 5000);
+      }
+      if(h.removed){ trackHazards.splice(i,1); }
       continue;
     }
-    // Gentle rotation for visibility
-    h.group.rotation.y+=0.01;
     for(const k of all){
       if(Math.hypot(k.pos.x-h.x,k.pos.z-h.z)<5.5){
         k.stunned=1200;
         SFX.hazardHit(selTrack.id);
-        if(k===player) floatMsg(
-          selTrack.id==='snow'?'🧊 ICE SPIKE!':selTrack.id==='forest'?'🪵 FALLEN LOG!':'🌾 HAY BALE!',
-          selTrack.id==='snow'?'#88DDFF':selTrack.id==='forest'?'#88AA44':'#FFD700'
-        );
         h.triggered=true;
         h.breakT=0;
         break;
@@ -2399,6 +2434,7 @@ function loop(){
       <line x1="22" y1="47" x2="19" y2="53" stroke="#FF6600" stroke-width="2.5" stroke-linecap="round"/>
       <line x1="30" y1="48" x2="29" y2="53" stroke="#FF6600" stroke-width="2.5" stroke-linecap="round"/>
     </svg>`;
+    if(id==='impossible') return `<div style="font-size:38px;line-height:44px;text-align:center;">💀</div>`;
     return '';
   }
 

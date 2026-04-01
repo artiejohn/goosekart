@@ -54,6 +54,10 @@ canvas#c{display:block;width:100vw;height:100vh;}
 </style>
 </head>
 <body>
+<audio id="aud_menu"   src="music_menu.mp3"   loop preload="auto"></audio>
+<audio id="aud_snow"   src="music_snow.mp3"   loop preload="auto"></audio>
+<audio id="aud_forest" src="music_forest.mp3" loop preload="auto"></audio>
+<audio id="aud_grass"  src="music_meadow.mp3" loop preload="auto"></audio>
 <canvas id="c"></canvas>
 <canvas id="menuGoose"></canvas>
 <div id="hud">
@@ -194,7 +198,7 @@ const DIFFICULTIES=[
   {id:'hard',     label:'Hard',      emoji:'🔥', color:'#FF8800',
    spdMult:1.18, launchSpd:0.55, lookahead:33, cornerLoad:0.25, turnMult:1.7, accel:1.55, cdMult:0.7},
   {id:'impossible',label:'Impossible',emoji:'💀', color:'#FF2222',
-   spdMult:1.18, launchSpd:0.55, lookahead:40, cornerLoad:0.15, turnMult:2.0, accel:1.8, cdMult:0.4},
+   spdMult:1.28, launchSpd:0.63, lookahead:45, cornerLoad:0.11, turnMult:2.2, accel:1.95, cdMult:0.3},
 ];
 const TRACK_CTRL={
   snow:[
@@ -210,6 +214,37 @@ const TRACK_CTRL={
     [-96,44],[-96,8],[-88,-24],[-74,-54],[-54,-80],[-22,-95],[14,-92],[44,-80],[66,-55],[76,-28],
   ],
 };
+
+// ── MUSIC ─────────────────────────────────────────────────────────────────────
+const MUSIC=(()=>{
+  const elMap={
+    menu:   'aud_menu',
+    snow:   'aud_snow',
+    forest: 'aud_forest',
+    grass:  'aud_grass',
+  };
+  let currentEl=null;
+  return {
+    play(trackId){
+      const elId=elMap[trackId];
+      if(!elId){ console.warn('MUSIC: unknown track',trackId); return; }
+      const el=document.getElementById(elId);
+      if(!el){ console.warn('MUSIC: element not found',elId); return; }
+      if(currentEl && currentEl!==el){ currentEl.pause(); currentEl.currentTime=0; }
+      currentEl=el;
+      el.volume=0.45;
+      el.currentTime=0;
+      el.play().catch(e=>console.warn('MUSIC play failed:',e));
+    },
+    stop(){
+      if(!currentEl) return;
+      currentEl.pause();
+      currentEl.currentTime=0;
+      currentEl=null;
+    },
+    setVolume(v){ if(currentEl) currentEl.volume=v; },
+  };
+})();
 
 // ── GAME STATE ────────────────────────────────────────────────────────────────
 let scene,camera,renderer,clock;
@@ -2219,6 +2254,7 @@ function endRace(){
   if(finished)return;finished=true;player.done=true;
   trackHazards.forEach(h=>scene.remove(h.group));trackHazards.length=0;
   SFX.stopEngine();
+  MUSIC.stop();
   const pos=getPos(),m=Math.floor(raceTime/60),s=(raceTime%60).toFixed(2);
   SFX.raceFinish(pos===1);
   document.getElementById('fintitle').textContent=pos===1?'🏆 WINNER! HONK HONK!':'🏁 RACE OVER!';
@@ -2239,6 +2275,7 @@ function startCD(){
     else setTimeout(()=>{
       el.style.display='none';cdActive=false;racing=true;
       SFX.startEngine();
+      MUSIC.play(selTrack.id);
       bots.forEach(b=>{b.spd=MAXSPD*selDiff.launchSpd;});
       spawnTrackHazard();
     },700);
@@ -2275,6 +2312,15 @@ function loop(){
 // ── MENU ──────────────────────────────────────────────────────────────────────
 (function(){
   let scid='honker',stid='snow',sdid='normal';
+  // Start menu music on first interaction (autoplay requires user gesture)
+  let menuMusicStarted=false;
+  function startMenuMusic(){
+    if(menuMusicStarted) return;
+    menuMusicStarted=true;
+    SFX.init();
+    MUSIC.play('menu');
+  }
+  document.addEventListener('click', startMenuMusic, {once:true});
   const cg=document.getElementById('cgrid');
 
   function charSVG(id){
@@ -2573,6 +2619,7 @@ function loop(){
     selChar=CHARS.find(c=>c.id===scid);
     selTrack=TRACKS.find(t=>t.id===stid);
     selDiff=DIFFICULTIES.find(d=>d.id===sdid);
+    MUSIC.stop();
     document.getElementById('menu').style.display='none';
     document.getElementById('hud').style.display='flex';
     document.getElementById('trkind').style.display='block';

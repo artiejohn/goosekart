@@ -176,7 +176,7 @@ const CHARS=[
   {id:'honker',name:'Sir Honks-a-Lot',emoji:'🪿',color:0xF5F0DC,accent:0xFFA500,
    ability:'MEGA HONK',desc:'Shockwave stuns nearby racers',spd:1.0,hdl:1.0,cd:8000},
   {id:'canada',name:'Goose Trudeau',  emoji:'🦆',color:0x2a2a2a,accent:0xFFFFFF,
-   ability:'FEATHER BLAST',desc:'Shoot feathers forward',    spd:1.0,hdl:1.0,cd:5000},
+   ability:'FEATHER BLAST',desc:'Shoot feathers forward',    spd:1.0,hdl:1.0,cd:7000},
   {id:'golden',name:'Golden Goose',   emoji:'⭐',color:0xFFCC00,accent:0xFF8800,
    ability:'EGG DROP',desc:'Drop eggs that stun drivers',      spd:1.0,hdl:1.0,cd:10000},
   {id:'racer', name:'Zoom McHonk',    emoji:'🏎️',color:0xFF3333,accent:0xFFFFFF,
@@ -198,7 +198,7 @@ const DIFFICULTIES=[
   {id:'hard',     label:'Hard',      emoji:'🔥', color:'#FF8800',
    spdMult:1.18, launchSpd:0.55, lookahead:33, cornerLoad:0.25, turnMult:1.7, accel:1.55, cdMult:0.7},
   {id:'impossible',label:'Impossible',emoji:'💀', color:'#FF2222',
-   spdMult:1.28, launchSpd:0.63, lookahead:45, cornerLoad:0.11, turnMult:2.2, accel:1.95, cdMult:0.3},
+   spdMult:1.17, launchSpd:0.54, lookahead:38, cornerLoad:0.18, turnMult:1.9, accel:1.55, cdMult:0.45},
 ];
 const TRACK_CTRL={
   snow:[
@@ -295,31 +295,55 @@ const SFX=(()=>{
 
   return {
     init,resume,
-    // Engine hum — continuous looping oscillators, pitch driven by speed
+    // Engine — AM modulated to simulate cylinder pulses like a real car
     startEngine(){
       if(!ctx||engineGain)return;
-      engineGain=ctx.createGain();engineGain.gain.value=0.04;
-      engineOsc=ctx.createOscillator();engineOsc.type='sawtooth';engineOsc.frequency.value=60;
-      engineOsc2=ctx.createOscillator();engineOsc2.type='square';engineOsc2.frequency.value=62;
-      const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=400;
-      engineOsc.connect(lp);engineOsc2.connect(lp);lp.connect(engineGain);engineGain.connect(ctx.destination);
-      engineOsc.start();engineOsc2.start();
+      engineGain=ctx.createGain(); engineGain.gain.value=0.0;
+
+      // Carrier: mid-range sawtooth for engine buzz
+      engineOsc=ctx.createOscillator(); engineOsc.type='sawtooth'; engineOsc.frequency.value=55;
+      // Modulator: lower freq oscillator that pulses the carrier (simulates cylinder firing)
+      engineOsc2=ctx.createOscillator(); engineOsc2.type='sine'; engineOsc2.frequency.value=28;
+
+      const modGain=ctx.createGain(); modGain.gain.value=0.5;
+      const carrierGain=ctx.createGain(); carrierGain.gain.value=1.0;
+
+      // Shape: bandpass centered on engine freq to cut extremes
+      const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=300; bp.Q.value=0.6;
+      // High-pass to remove any remaining sub-bass drone
+      const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=100;
+
+      // AM: modulator controls carrier amplitude
+      engineOsc2.connect(modGain);
+      modGain.connect(carrierGain.gain);
+      engineOsc.connect(carrierGain);
+      carrierGain.connect(hp); hp.connect(bp); bp.connect(engineGain);
+      engineGain.connect(ctx.destination);
+
+      engineOsc.start(); engineOsc2.start();
+      // Store extra refs for updateEngine
+      engineGain._mod=engineOsc2; engineGain._bp=bp; engineGain._hp=hp;
+      engineGain.gain.setTargetAtTime(0.08,ctx.currentTime,0.4);
     },
     updateEngine(spd){
       if(!engineOsc||!engineGain)return;
       const norm=Math.abs(spd)/MAXSPD;
-      const freq=55+norm*180;
-      engineOsc.frequency.setTargetAtTime(freq,ctx.currentTime,0.05);
-      engineOsc2.frequency.setTargetAtTime(freq*1.03,ctx.currentTime,0.05);
-      engineGain.gain.setTargetAtTime(0.02+norm*0.06,ctx.currentTime,0.05);
+      // Carrier pitch rises with speed — like revving up through gears
+      const carrier=70+norm*130;
+      engineOsc.frequency.setTargetAtTime(carrier,ctx.currentTime,0.05);
+      // Modulator (cylinder pulse rate) also rises
+      if(engineGain._mod) engineGain._mod.frequency.setTargetAtTime(22+norm*55,ctx.currentTime,0.05);
+      // Bandpass tracks engine freq
+      if(engineGain._bp) engineGain._bp.frequency.setTargetAtTime(120+norm*220,ctx.currentTime,0.05);
+      engineGain.gain.setTargetAtTime(0.06+norm*0.09,ctx.currentTime,0.05);
     },
     stopEngine(){
       if(!engineGain)return;
-      engineGain.gain.setTargetAtTime(0,ctx.currentTime,0.1);
+      engineGain.gain.setTargetAtTime(0,ctx.currentTime,0.15);
       setTimeout(()=>{
         try{engineOsc.stop();engineOsc2.stop();}catch(e){}
         engineOsc=engineOsc2=engineGain=null;
-      },300);
+      },400);
     },
     // HONK — loud goose honk
     honk(){
@@ -1700,7 +1724,9 @@ function updateBot(b,dt){
     while(wda>Math.PI)wda-=Math.PI*2;
     while(wda<-Math.PI)wda+=Math.PI*2;
     const wallStrength=Math.min(Math.sqrt(wallPushX*wallPushX+wallPushZ*wallPushZ),1);
-    ta+=wda*wallStrength*0.9;
+    // Clamp wall correction to ±90° so it can never flip the bot around
+    const wallCorrect=Math.max(-Math.PI*0.5, Math.min(Math.PI*0.5, wda*wallStrength*0.7));
+    ta+=wallCorrect;
   }
   if(kartPushX!==0||kartPushZ!==0){
     const kartAng=Math.atan2(-kartPushX,-kartPushZ);
@@ -1761,10 +1787,27 @@ function updateBot(b,dt){
     while(hda>Math.PI)hda-=Math.PI*2;
     while(hda<-Math.PI)hda+=Math.PI*2;
     const hazStrength=Math.min(Math.sqrt(hazPushX*hazPushX+hazPushZ*hazPushZ),1)*0.85;
-    ta+=hda*hazStrength;
+    // Clamp hazard correction to ±75° so bots don't spin trying to dodge
+    ta+=Math.max(-Math.PI*0.42, Math.min(Math.PI*0.42, hda*hazStrength));
     const closestHaz=trackHazards.filter(h=>!h.triggered&&!h.removed)
       .reduce((mn,h)=>{ const d=Math.hypot(b.pos.x-h.x,b.pos.z-h.z); return d<mn?d:mn; },Infinity);
     if(closestHaz<HAZARD_SENSE*0.6) b.spd*=0.97;
+  }
+
+  // ── STUCK DETECTION ────────────────────────────────────────────────────────
+  // If a bot has barely moved in the last ~1s, force it back toward its waypoint
+  if(!b.stuckTimer) b.stuckTimer=0;
+  if(!b.lastPos) b.lastPos={x:b.pos.x,z:b.pos.z};
+  b.stuckTimer+=dt;
+  if(b.stuckTimer>0.9){
+    const moved=Math.hypot(b.pos.x-b.lastPos.x, b.pos.z-b.lastPos.z);
+    if(moved<1.5){
+      // Override target angle straight to waypoint, ignoring all push forces
+      ta=Math.atan2(-dx,-dz);
+      b.spd=Math.max(b.spd, MAXSPD*0.3); // give it a nudge
+    }
+    b.lastPos={x:b.pos.x,z:b.pos.z};
+    b.stuckTimer=0;
   }
 
   let da=ta-b.angle;
@@ -1886,7 +1929,7 @@ function updateProjs(dt){
     // Point mesh in direction of travel
     p.mesh.rotation.y=Math.atan2(-p.dx,-p.dz);
     let hit=false;
-    for(const v of p.victims)if(Math.hypot(p.pos.x-v.pos.x,p.pos.z-v.pos.z)<5.0){v.stunned=1400;hit=true;break;}
+    for(const v of p.victims)if(Math.hypot(p.pos.x-v.pos.x,p.pos.z-v.pos.z)<3.2){v.stunned=700;hit=true;break;}
     if(hit||p.life<=0){scene.remove(p.mesh);projs.splice(i,1);}
   }
 }
@@ -2118,55 +2161,175 @@ function updateTrackHazards(dt){
 function useAbility(k,victims){
   if(!k.abReady)return;
   k.abReady=false;k.abCd=k.char.cd;
-  const ip=k===player;
   if(k.char.id==='honker'){
-    spawnShockwave(k.pos,0xFFDD00,victims);
+    const honkOffset=5;
+    const honkPos={x:k.pos.x-Math.sin(k.angle)*honkOffset, z:k.pos.z-Math.cos(k.angle)*honkOffset};
+    spawnShockwave(honkPos,0xFFDD00,victims);
     SFX.honk();
-    if(ip){flash('#FFD700',0.45);floatMsg('💛 MEGA HONK!','#FFD700');}
+    // Expanding shockrings
+    for(let r=0;r<3;r++){
+      setTimeout(()=>{
+        const ringMat=new THREE.MeshBasicMaterial({color:r===0?0xFFFFAA:r===1?0xFFDD00:0xFF8800,transparent:true,opacity:0.9,side:THREE.DoubleSide});
+        const ring=new THREE.Mesh(new THREE.RingGeometry(0.3,1.1,48),ringMat);
+        ring.rotation.x=-Math.PI/2; ring.position.set(k.pos.x,0.15,k.pos.z); scene.add(ring);
+        let t=0;
+        (function tick(){ t+=0.016;
+          const s=1+t*28; ring.scale.set(s,s,s); ringMat.opacity=Math.max(0,0.9-t*1.4);
+          if(t<0.65) requestAnimationFrame(tick); else scene.remove(ring);
+        })();
+      }, r*80);
+    }
+    // Outward particle burst
+    for(let i=0;i<7;i++){
+      const ang=Math.random()*Math.PI*2, spd=14+Math.random()*22, vy=4+Math.random()*12;
+      const col=[0xFFFFAA,0xFFDD00,0xFFAA00,0xFFFFFF,0xFFEE55][i%5];
+      const sz=0.3+Math.random()*0.55;
+      const shape=i%4===0?new THREE.BoxGeometry(sz,sz,sz):new THREE.SphereGeometry(sz,8,6);
+      const m=new THREE.Mesh(shape,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:1}));
+      m.position.set(k.pos.x+(Math.random()-0.5)*2,0.8+Math.random()*1.5,k.pos.z+(Math.random()-0.5)*2);
+      scene.add(m);
+      const vx=Math.cos(ang)*spd, vz=Math.sin(ang)*spd;
+      let life=0.7+Math.random()*0.5, vy2=vy;
+      (function tick(){ life-=0.016; vy2-=18*0.016;
+        m.position.x+=vx*0.016; m.position.z+=vz*0.016; m.position.y+=vy2*0.016;
+        m.rotation.x+=0.12; m.rotation.z+=0.09;
+        m.material.opacity=Math.max(0,life/1.2); m.scale.setScalar(Math.max(0.05,life/0.7));
+        if(life>0) requestAnimationFrame(tick); else scene.remove(m);
+      })();
+    }
+    // Rising gold sparks at honk origin
+    const hx=k.pos.x-Math.sin(k.angle)*honkOffset, hz=k.pos.z-Math.cos(k.angle)*honkOffset;
+    for(let i=0;i<8;i++){
+      setTimeout(()=>{
+        const sp=new THREE.Mesh(new THREE.SphereGeometry(0.2+Math.random()*0.25,7,5),
+          new THREE.MeshBasicMaterial({color:i%2===0?0xFFDD00:0xFFFFAA,transparent:true,opacity:1}));
+        const a=Math.random()*Math.PI*2, r=Math.random()*3.5;
+        sp.position.set(hx+Math.cos(a)*r,0.2,hz+Math.sin(a)*r); scene.add(sp);
+        const vy=8+Math.random()*14; let life=0.8+Math.random()*0.4;
+        (function tick(){ life-=0.016; sp.position.y+=vy*0.016;
+          sp.material.opacity=Math.max(0,life/1.2); sp.scale.setScalar(Math.max(0.05,life/0.8));
+          if(life>0) requestAnimationFrame(tick); else scene.remove(sp);
+        })();
+      }, i*18);
+    }
   } else if(k.char.id==='canada'){
-    // Aim at the nearest victim that is ahead of the kart
     let aimAng=k.angle;
     let bestDist=Infinity;
     for(const v of victims){
       const vdx=v.pos.x-k.pos.x, vdz=v.pos.z-k.pos.z;
       const dist=Math.sqrt(vdx*vdx+vdz*vdz);
-      // Check if victim is roughly in front (dot product with facing dir > 0)
       const facingX=-Math.sin(k.angle), facingZ=-Math.cos(k.angle);
       const dot=vdx/dist*facingX+vdz/dist*facingZ;
       if(dot>0.3 && dist<bestDist){ bestDist=dist; aimAng=Math.atan2(-vdx,-vdz); }
     }
     const group=new THREE.Group();
-    // Main quill shaft — long bright white cylinder
-    const shaft=new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12,0.45,3.8,8),
-      new THREE.MeshBasicMaterial({color:0xFFFFFF})
-    );
-    shaft.rotation.x=Math.PI/2;
-    group.add(shaft);
-    // Bright yellow-gold quill base
-    const base=new THREE.Mesh(
-      new THREE.SphereGeometry(0.55,8,6),
-      new THREE.MeshBasicMaterial({color:0xFFEE44})
-    );
-    base.position.set(0,0,0.8);
-    group.add(base);
-    // Glowing cyan tip
-    const tip=new THREE.Mesh(
-      new THREE.SphereGeometry(0.38,8,6),
-      new THREE.MeshBasicMaterial({color:0x44FFFF})
-    );
-    tip.position.set(0,0,-1.6);
-    group.add(tip);
+    const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.45,3.8,8),new THREE.MeshBasicMaterial({color:0xFFFFFF}));
+    shaft.rotation.x=Math.PI/2; group.add(shaft);
+    const base=new THREE.Mesh(new THREE.SphereGeometry(0.55,8,6),new THREE.MeshBasicMaterial({color:0xFFEE44}));
+    base.position.set(0,0,0.8); group.add(base);
+    const tip=new THREE.Mesh(new THREE.SphereGeometry(0.38,8,6),new THREE.MeshBasicMaterial({color:0x44FFFF}));
+    tip.position.set(0,0,-1.6); group.add(tip);
     group.rotation.y=aimAng;
     group.position.set(k.pos.x,1.4,k.pos.z);
     scene.add(group);
-    const pm={mesh:group,pos:k.pos.clone(),dx:-Math.sin(aimAng)*1.4,dz:-Math.cos(aimAng)*1.4,life:5500,victims,spin:0.14};
+    const pm={mesh:group,pos:k.pos.clone(),dx:-Math.sin(aimAng)*0.9,dz:-Math.cos(aimAng)*0.9,life:3500,victims,spin:0.14};
     projs.push(pm);
-    if(ip){flash('#FFFFFF',0.35);floatMsg('🪶 FEATHER BLAST!','#fff');}
+    // Cyan energy ring
+    const cRingMat=new THREE.MeshBasicMaterial({color:0x44FFFF,transparent:true,opacity:0.95,side:THREE.DoubleSide});
+    const cRing=new THREE.Mesh(new THREE.RingGeometry(0.2,0.8,40),cRingMat);
+    cRing.rotation.x=-Math.PI/2; cRing.position.set(k.pos.x,0.3,k.pos.z); scene.add(cRing);
+    let ct=0;
+    (function tick(){ ct+=0.016; const s=1+ct*20; cRing.scale.set(s,s,s);
+      cRingMat.opacity=Math.max(0,0.95-ct*2.5);
+      if(ct<0.4) requestAnimationFrame(tick); else scene.remove(cRing);
+    })();
+    // Feather shapes fanning out
+    for(let i=0;i<7;i++){
+      const ang=(i/12)*Math.PI*2, spd=10+Math.random()*16;
+      const fg=new THREE.Group();
+      const fs=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.22,2.8,8),new THREE.MeshBasicMaterial({color:0xFFFFFF,transparent:true,opacity:1}));
+      fs.rotation.x=Math.PI/2; fg.add(fs);
+      const fv=new THREE.Mesh(new THREE.SphereGeometry(0.38,10,7),new THREE.MeshBasicMaterial({color:i%3===0?0xAAEEFF:i%3===1?0xFFFFFF:0xCCFFFF,transparent:true,opacity:0.9}));
+      fv.scale.set(0.45,1,1.8); fv.position.set(0,0,-0.5); fg.add(fv);
+      fg.rotation.y=ang; fg.position.set(k.pos.x,1.2+Math.random()*0.8,k.pos.z);
+      scene.add(fg);
+      const vx=Math.cos(ang)*spd, vz=Math.sin(ang)*spd, vy=3+Math.random()*6;
+      let life=0.9+Math.random()*0.5, vy2=vy;
+      (function tick(){ life-=0.016; vy2-=12*0.016;
+        fg.position.x+=vx*0.016; fg.position.z+=vz*0.016; fg.position.y+=vy2*0.016;
+        fg.rotation.z+=0.07; fg.rotation.x+=0.05;
+        fg.children.forEach(c=>{if(c.material)c.material.opacity=Math.max(0,life/1.4);});
+        if(life>0) requestAnimationFrame(tick); else scene.remove(fg);
+      })();
+    }
+    // Wisp cloud
+    for(let i=0;i<9;i++){
+      setTimeout(()=>{
+        const w=new THREE.Mesh(new THREE.SphereGeometry(0.25+Math.random()*0.35,8,6),
+          new THREE.MeshBasicMaterial({color:i%2===0?0xAAFFFF:0xFFFFFF,transparent:true,opacity:0.9}));
+        const a=Math.random()*Math.PI*2, r=Math.random()*4;
+        w.position.set(k.pos.x+Math.cos(a)*r,0.4+Math.random()*2.5,k.pos.z+Math.sin(a)*r);
+        scene.add(w);
+        const vx=(Math.random()-0.5)*5, vz=(Math.random()-0.5)*5, vy=4+Math.random()*7;
+        let life=0.6+Math.random()*0.5;
+        (function tick(){ life-=0.016;
+          w.position.x+=vx*0.016; w.position.z+=vz*0.016; w.position.y+=vy*0.016;
+          w.material.opacity=Math.max(0,life/1.1)*0.9;
+          if(life>0) requestAnimationFrame(tick); else scene.remove(w);
+        })();
+      }, i*20);
+    }
     SFX.featherBlast();
   } else if(k.char.id==='golden'){
     spawnEggs(k,victims);
-    if(ip){flash('#FFD700',0.45);floatMsg('🥚 EGG DROP!','#FFD700');}
+    k.spd=Math.min(k.spd+0.06, MAXSPD*k.char.spd*1.08);
+    // Ground rings
+    for(let r=0;r<2;r++){
+      setTimeout(()=>{
+        const gRingMat=new THREE.MeshBasicMaterial({color:r===0?0xFFDD00:0xFFAA00,transparent:true,opacity:0.85,side:THREE.DoubleSide});
+        const gRing=new THREE.Mesh(new THREE.RingGeometry(0.2,0.9,40),gRingMat);
+        gRing.rotation.x=-Math.PI/2; gRing.position.set(k.pos.x,0.12,k.pos.z); scene.add(gRing);
+        let t=0;
+        (function tick(){ t+=0.016; const s=1+t*22; gRing.scale.set(s,s,s);
+          gRingMat.opacity=Math.max(0,0.85-t*1.8);
+          if(t<0.5) requestAnimationFrame(tick); else scene.remove(gRing);
+        })();
+      }, r*100);
+    }
+    // Spinning coin discs
+    for(let i=0;i<12;i++){
+      const ang=Math.random()*Math.PI*2, spd=8+Math.random()*14;
+      const disc=new THREE.Mesh(new THREE.CylinderGeometry(0.5+Math.random()*0.4,0.5+Math.random()*0.4,0.12,16),
+        new THREE.MeshBasicMaterial({color:[0xFFDD00,0xFFAA00,0xFFEE44,0xFF8800][i%4],transparent:true,opacity:1}));
+      disc.position.set(k.pos.x+(Math.random()-0.5)*1.5,0.5+Math.random(),k.pos.z+(Math.random()-0.5)*1.5);
+      scene.add(disc);
+      const vx=Math.cos(ang)*spd, vz=Math.sin(ang)*spd, vy=6+Math.random()*10;
+      let life=0.9+Math.random()*0.6, vy2=vy, spinSpd=(Math.random()-0.5)*0.3;
+      (function tick(){ life-=0.016; vy2-=15*0.016;
+        disc.position.x+=vx*0.016; disc.position.z+=vz*0.016; disc.position.y+=vy2*0.016;
+        disc.rotation.y+=spinSpd; disc.rotation.x+=0.1;
+        disc.material.opacity=Math.max(0,life/1.5); disc.scale.setScalar(Math.max(0.05,life/0.9));
+        if(life>0) requestAnimationFrame(tick); else scene.remove(disc);
+      })();
+    }
+    // Gold geyser sparks
+    for(let i=0;i<12;i++){
+      setTimeout(()=>{
+        const col=[0xFFDD00,0xFFAA00,0xFFFFAA,0xFF8800,0xFFEE55][i%5];
+        const sp=new THREE.Mesh(new THREE.SphereGeometry(0.18+Math.random()*0.28,8,6),
+          new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:1}));
+        const a=Math.random()*Math.PI*2, r=Math.random()*2.8;
+        sp.position.set(k.pos.x+Math.cos(a)*r,0.3,k.pos.z+Math.sin(a)*r);
+        scene.add(sp);
+        const vy=12+Math.random()*18, vx=(Math.random()-0.5)*4, vz=(Math.random()-0.5)*4;
+        let life=0.8+Math.random()*0.7, vy2=vy;
+        (function tick(){ life-=0.016; vy2-=14*0.016;
+          sp.position.x+=vx*0.016; sp.position.z+=vz*0.016; sp.position.y+=vy2*0.016;
+          sp.material.opacity=Math.max(0,life/1.5); sp.scale.setScalar(Math.max(0.05,life/0.8));
+          if(life>0) requestAnimationFrame(tick); else scene.remove(sp);
+        })();
+      }, i*15);
+    }
     SFX.eggDrop();
   }
   // racer has no ability — cd:99999 means this is never reached
